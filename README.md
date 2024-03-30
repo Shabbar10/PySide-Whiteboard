@@ -15,19 +15,18 @@ Using PySide6 to make a Whiteboard with (potentially) over-the-network capabilit
 - Be able to draw shapes (ellipse, rectangle and straight line) using the mouse
 - Have pages within a single whiteboard
 - Give access to users (Google Drive-esque)
-
+<br>
 - Have users working on the same whiteboard from different PCs
   In this, have a main server as a UDP server, then connect to main server using QUDPSocket from the clients.
   Have redis store temporary info for sessions i.e. host and clients etc
 
 ## To Get Started
-Optional: //
-Have a virtual environment: `python -m venv <name of environemt>` \\
-Activate environment:
-On Windows:
+Optional: Have a virtual environment: <br> `python -m venv <name of environemt>` <br><br>
+### Activate environment: <br>
+#### On Windows:
 `<name of environment>\Scripts\activate`
 
-On Mac/Linux:
+#### On Mac/Linux:
 `source <name of environment>/bin/activate`
 
 Next, install pyside6
