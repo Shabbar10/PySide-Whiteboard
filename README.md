@@ -16,7 +16,7 @@ Using PySide6 to make a Whiteboard with (potentially) over-the-network capabilit
 - Have pages within a single whiteboard
 - Give access to users (Google Drive-esque)
 <br>
-- Have users working on the same whiteboard from different PCs
+- Have users working on the same whiteboard from different PCs <br>
   In this, have a main server as a UDP server, then connect to main server using QUDPSocket from the clients.
   Have redis store temporary info for sessions i.e. host and clients etc
 
