@@ -21,8 +21,8 @@ Using PySide6 to make a Whiteboard with (potentially) over-the-network capabilit
   Have redis store temporary info for sessions i.e. host and clients etc
 
 ## To Get Started
-Optional:
-Have a virtual environment: `python -m venv <name of environemt>`
+Optional: //
+Have a virtual environment: `python -m venv <name of environemt>` \\
 Activate environment:
 On Windows:
 `<name of environment>\Scripts\activate`
