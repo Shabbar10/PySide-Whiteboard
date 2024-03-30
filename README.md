@@ -12,6 +12,7 @@ Using PySide6 to make a Whiteboard with (potentially) over-the-network capabilit
 - Save and load whiteboards
 
 ## TODO
+- Be able to draw shapes (ellipse, rectangle and straight line) using the mouse
 - Have pages within a single whiteboard
 - Give access to users (Google Drive-esque)
 
