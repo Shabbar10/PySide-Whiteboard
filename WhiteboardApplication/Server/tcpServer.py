@@ -27,6 +27,7 @@ from PySide6.QtCore import (
 import json
 from WhiteboardApplication.UI.board import Ui_MainWindow
 from tcpServerNet import start_server, MyServer, signal_manager
+
 itemTypes = set()
 myserver = MyServer()
 
@@ -34,11 +35,14 @@ myserver = MyServer()
 class User:
     def __init__(self):
         pass
+
+
 class BoardScene(QGraphicsScene):
     def __init__(self):
         super().__init__()
         self.setSceneRect(0, 0, 600, 500)
         self.flag = 0
+        self.next_z_index = 0
 
         self.temppath = []
         self.path = None
@@ -49,8 +53,8 @@ class BoardScene(QGraphicsScene):
         self.pathItem = None
         self.drawn_paths = []
         self.my_pen = None
-        self.data = {"event" : "",
-                     "state" : False,
+        self.data = {"event": "",
+                     "state": False,
                      "position": None,
                      "color": None,
                      "widthF": None,
@@ -83,6 +87,7 @@ class BoardScene(QGraphicsScene):
             if isinstance(item, QGraphicsPathItem):
                 if item.pen().color() != Qt.white:
                     item.setZValue(self.default_z_index)
+
     def change_color(self, color):
         self.color = color
 
@@ -101,7 +106,6 @@ class BoardScene(QGraphicsScene):
             self.pathItem.setPen(self.my_pen)
             self.addItem(self.pathItem)
 
-
             # print(self.items())
             for item in self.items():
                 itemTypes.add(type(item).__name__)
@@ -111,7 +115,7 @@ class BoardScene(QGraphicsScene):
 
             # print(self.data)
             # itemTypes.clear()
-
+            signal_manager.function_call.emit(True)
 
 
     def mouseMoveEvent(self, event):
@@ -131,6 +135,8 @@ class BoardScene(QGraphicsScene):
 
             # print(itemTypes)
             # itemTypes.clear()
+            signal_manager.function_call.emit(True)
+
 
     def mouseReleaseEvent(self, event):
         if event.button() == Qt.MouseButton.LeftButton:
@@ -147,11 +153,9 @@ class BoardScene(QGraphicsScene):
             # print(itemTypes)
             # itemTypes.clear()
             self.drawing_events("mouseReleaseEvent")
+            signal_manager.function_call.emit(True)
 
             # print(self.data)
-
-
-
 
     def get_drawn_paths(self):
         return self.drawn_paths
@@ -172,8 +176,6 @@ class BoardScene(QGraphicsScene):
         self.data["style"] = self.my_pen.style()
         self.data["pattern"] = self.my_pen.dashPattern()
         self.data["patternOffset"] = self.my_pen.dashOffset()
-
-
 
     def configure_pen(self, scene_info):
         color = QColor(scene_info["color"])
@@ -255,7 +257,6 @@ class BoardScene(QGraphicsScene):
                 self.path.moveTo(self.path.currentPosition())
                 # self.pathItem = QGraphicsPathItem()
 
-
                 # print(f"Current Pos: {self.path.currentPosition()}")
                 # print(point)
 
@@ -284,178 +285,7 @@ class BoardScene(QGraphicsScene):
             # print(f"Current Pos: {self.path.currentPosition()}")
             # print(point)
 
-    def build_scene_file(self, data):
-        # self.clear()
-        print(f"Data : {data}")
-        top_z_index = self.get_topmost_z_index()  # Get the highest z-index
-        if 'color' == "#FFFFFF":
-            self.set_eraser_z_index(top_z_index + 3)  # Set higher z-index for eraser
-        else:
-            if self.eraser_z_index is not None:
-                self.default_z_index = self.eraser_z_index + 4
-                self.set_default_z_index()  # Set default z-index for other colors
-            else:
-                self.set_default_z_index()  # Set default z-index for other colors
 
-
-        prev = {'lines': [],  # stores info of each line drawn
-            'scene_rect': [],  # stores dimension of scene
-            'color': "",  # store the color used
-            'size': 20 # store the size of the pen
-        }
-
-        # top_z = self.get_topmost_z_index()
-        try:
-            if 'color' != '#FFFFFF':
-                # self.set_default_z_index()
-                if 'scene_rect' in data:
-                    scene_rect = data['scene_rect']
-                    self.setSceneRect(0, 0, scene_rect[0], scene_rect[1])
-                else:
-                    # Provide default scene rectangle if 'scene_rect' key is missing
-                    self.setSceneRect(0, 0, 600, 500)  # Adjust the default values as needed
-                self.change_color(QColor(data['color']))
-
-                if 'size' in data.keys():
-                    self.change_size(data['size'])
-                    prev = data
-
-                else:
-                    # self.change_size(prev['size'])
-
-                    pass
-                # Add lines to the scene
-                if 'lines' in data:
-                    for line_data in data['lines']:
-                        path = QPainterPath()
-                        path.moveTo(line_data['points'][0][0], line_data['points'][0][1])
-
-                        for subpath in line_data['points'][1:]:
-                            path.lineTo(subpath[0], subpath[1])
-                        self.temppath.append(path)
-                        print(f"Current Path(Not eraser): {path}")
-                        print(f"Existing path: {self.temppath}")
-
-                        for item in self.items():
-                            if isinstance(item, QGraphicsPathItem) and item.path() == path:
-                                self.removeItem(item)
-
-                        pathItem = QGraphicsPathItem(path)
-                        pathItem.setZValue(10)
-                        # pathItem.setZValue(high_z + 0.2)
-                        my_pen = QPen(QColor(line_data['color']), line_data['width'])
-                        my_pen.setCapStyle(Qt.PenCapStyle.RoundCap)
-                        pathItem.setPen(my_pen)
-
-                        self.addItem(pathItem)
-                else:
-                    # for line_data in prev['lines']:
-                    #     path = QPainterPath()
-                    #     path.moveTo(line_data['points'][0][0], line_data['points'][0][1])
-                    #
-                    #     for subpath in line_data['points'][1:]:
-                    #         path.lineTo(subpath[0], subpath[1])
-                    #
-                    #     pathItem = QGraphicsPathItem(path)
-                    #     pathItem.setZValue(10)
-                    #
-                    #     my_pen = QPen(QColor(line_data['color']), line_data['width'])
-                    #     my_pen.setCapStyle(Qt.PenCapStyle.RoundCap)
-                    #     pathItem.setPen(my_pen)
-                    #
-                    #     self.addItem(pathItem)
-                    pass
-            elif 'color' == '#FFFFFF':
-                # self.set_eraser_z_index()
-                if 'scene_rect' in data:
-                    scene_rect = data['scene_rect']
-                    self.setSceneRect(0, 0, scene_rect[0], scene_rect[1])
-                else:
-                    # Provide default scene rectangle if 'scene_rect' key is missing
-                    self.setSceneRect(0, 0, 600, 500)  # Adjust the default values as needed
-                self.change_color(QColor(data['color']))
-
-                if 'size' in data.keys():
-                    self.change_size(data['size'])
-                    prev = data
-
-                else:
-                    # self.change_size(prev['size'])
-                    pass
-
-
-
-            # Add lines to the scene
-            if 'lines' in data:
-                for line_data in data['lines']:
-                    path = QPainterPath()
-                    path.moveTo(line_data['points'][0][0], line_data['points'][0][1])
-
-                    for subpath in line_data['points'][1:]:
-                        path.lineTo(subpath[0], subpath[1])
-
-                    self.temppath.append(path)
-
-                    pathItem = QGraphicsPathItem(path)
-                    print(f"Current Items: {path}")
-                    print(f"Existing path: {self.temppath}")
-                    # if self.items():
-                    curr_items = self.items()
-                    for item in curr_items:
-                        if isinstance(item, QGraphicsPathItem) and item.path() == path:
-                            self.removeItem(item)
-
-
-                    pathItem.setZValue(10)
-
-                    my_pen = QPen(QColor(line_data['color']), line_data['width'])
-                    # self.color = QColor(line_data['color'])
-                    # self.size = line_data['width']
-                    # self.change_size(line_data['width'])
-                    my_pen.setCapStyle(Qt.PenCapStyle.RoundCap)
-                    pathItem.setPen(my_pen)
-
-                    self.addItem(pathItem)
-            else:
-                # for line_data in prev['lines']:
-                #     path = QPainterPath()
-                #     path.moveTo(line_data['points'][0][0], line_data['points'][0][1])
-                #
-                #     for subpath in line_data['points'][1:]:
-                #         path.lineTo(subpath[0], subpath[1])
-                #
-                #     pathItem = QGraphicsPathItem(path)
-                #     pathItem.setZValue(10)
-                #
-                #     my_pen = QPen(QColor(line_data['color']), line_data['width'])
-                #     # self.color = QColor(line_data['color'])
-                #     # self.size = line_data['width']
-                #     # self.change_size(line_data['width'])
-                #     my_pen.setCapStyle(Qt.PenCapStyle.RoundCap)
-                #     my_pen.setCapStyle(Qt.PenCapStyle.RoundCap)
-                #     pathItem.setPen(my_pen)
-                #
-                #     self.addItem(pathItem)
-                pass
-            # if 'lines' in data:
-            #     for line_data in data['lines']:
-            #         path = QPainterPath()
-            #         path.moveTo(line_data['points'][0][0], line_data['points'][0][1])
-            #         for subpath in line_data['points'][1:]:
-            #             path.lineTo(subpath[0], subpath[1])
-            #         self.drawn_paths.remove(path)
-            #
-            # else:
-            #     for line_data in prev['lines']:
-            #         path = QPainterPath()
-            #         path.moveTo(line_data['points'][0][0], line_data['points'][0][1])
-            #
-            #         for subpath in line_data['points'][1:]:
-            #             path.lineTo(subpath[0], subpath[1])
-            #         self.removeItem(path)
-        except IndexError as e:
-            print(e)
-            pass
 
     def get_z_index_range(self):
         highest_z = float("-inf")
@@ -464,6 +294,7 @@ class BoardScene(QGraphicsScene):
             highest_z = max(highest_z, item.zValue())
             lowest_z = min(lowest_z, item.zValue())
         return highest_z, lowest_z
+
 
 class MainWindow(QMainWindow, Ui_MainWindow):
     def __init__(self):
@@ -521,13 +352,15 @@ class MainWindow(QMainWindow, Ui_MainWindow):
                 'size': self.scene.size  # store the size of the pen
             }
             # loop for checking of drawn path
-            for item in self.scene.items():
+            for item in reversed(self.scene.items()):
                 if isinstance(item, QGraphicsPathItem):
                     line_data = {
                         'color': item.pen().color().name(),
                         'width': item.pen().widthF(),
-                        'points': []  # stores the (X,Y) coordinate of the line
+                        'points': [],  # stores the (X,Y) coordinate of the line
+                        # 'z_value': item.zValue()  # Store the z-value
                     }
+                    # print(f"Item value : {item.zValue()}")
 
                     # Extract points from the path
                     for subpath in item.path().toSubpathPolygons():  # to SubpathPolygons method is used to break down
@@ -540,6 +373,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
                 json.dump(data, file)
 
     def load_file(self):
+        self.scene.z_index_counter = 0
         filename, _ = QFileDialog.getOpenFileName(self, "Open File", "", "Whiteboard Files (*.json)")  # open dialog
         # window to Open the file
         if filename:  # reading the file
@@ -553,6 +387,9 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             self.scene.change_color(QColor(data['color']))
             self.scene.change_size(data['size'])
 
+            z_index_counter = 0
+
+            items = []  # List to hold items before sorting
             # Add lines to the scene
             for line_data in data['lines']:
                 path = QPainterPath()
@@ -562,11 +399,19 @@ class MainWindow(QMainWindow, Ui_MainWindow):
                     path.lineTo(subpath[0], subpath[1])
 
                 pathItem = QGraphicsPathItem(path)
+                pathItem.setZValue(z_index_counter)  # Assign unique z-index
+                z_index_counter += 1  # Increment counter
                 my_pen = QPen(QColor(line_data['color']), line_data['width'])
                 my_pen.setCapStyle(Qt.PenCapStyle.RoundCap)
                 pathItem.setPen(my_pen)
 
+                # items.append(pathItem)
+
                 self.scene.addItem(pathItem)
+            #
+            # items.sort(key=lambda x: x.zValue())
+            # for item in items:
+                # self.scene.addItem(pathItem)
 
     def Close_window(self):
         self.close()
@@ -580,6 +425,8 @@ class MainWindow(QMainWindow, Ui_MainWindow):
 
     def undo(self):
         if self.scene.items():
+            print('Undo called')
+            print(self.scene.items())
             latest_item = self.scene.items()
             self.redo_list.append(latest_item)
             self.scene.removeItem(latest_item[0])
@@ -607,12 +454,107 @@ class MainWindow(QMainWindow, Ui_MainWindow):
     def color_changed(self, color):
         self.scene.change_color(color)
 
-
     def button_clicked(self):
         sender_button = self.sender()
         for btn in self.list_of_buttons:
             if btn is not sender_button:
                 btn.setChecked(False)
+
+    def build_scene_file(self, data):
+        self.scene.clear()
+
+        # Set composition mode to Source
+        # self.scene.setCompositionMode(QPainter.CompositionMode_Source)
+        # self.clear()
+        # print(f"Data : {data}")
+        scene_file = data['scene_info']
+
+        # scene_file = prev
+        undo_flag = data['flag']
+        # top_z_index = self.scene.get_topmost_z_index()  # Get the highest z-index
+        # if 'color' == "#FFFFFF":
+        #     self.scene.set_eraser_z_index(top_z_index + 3)  # Set higher z-index for eraser
+        # else:
+        #     if self.scene.eraser_z_index is not None:
+        #         self.scene.default_z_index = self.scene.eraser_z_index + 4
+        #         self.scene.set_default_z_index()  # Set default z-index for other colors
+        #     else:
+        #         self.scene.set_default_z_index()  # Set default z-index for other colors
+        self.scene.drawing = True
+        prev = {'lines': [],  # stores info of each line drawn
+                'scene_rect': [],  # stores dimension of scene
+                'color': "",  # store the color used
+                'size': 20  # store the size of the pen
+                }
+
+        top_z = self.scene.get_topmost_z_index()
+        try:
+            # if 'color' != '#FFFFFF':
+            # if undo_flag is False and 'scene_info' in data:
+            if 'scene_info' in data:
+                # self.set_default_z_index()
+                if 'scene_rect' in scene_file:
+                    scene_rect = scene_file['scene_rect']
+                    self.scene.setSceneRect(0, 0, scene_rect[0], scene_rect[1])
+                else:
+                    # Provide default scene rectangle if 'scene_rect' key is missing
+                    self.scene.setSceneRect(0, 0, 600, 500)  # Adjust the default values as needed
+                self.scene.change_color(QColor(scene_file['color']))
+                self.scene.color.setAlpha(255)
+
+                if 'size' in scene_file.keys():
+                    self.scene.change_size(scene_file['size'])
+                    prev = scene_file
+
+                else:
+                    # self.change_size(prev['size'])
+
+                    pass
+                # Add lines to the scene
+                if 'lines' in scene_file:
+                    for line_data in scene_file['lines']:
+                        path = QPainterPath()
+                        path.moveTo(line_data['points'][0][0], line_data['points'][0][1])
+
+                        for subpath in line_data['points'][1:]:
+                            path.lineTo(subpath[0], subpath[1])
+
+                        self.scene.temppath.clear()
+
+                        if path not in self.scene.temppath:
+                            self.scene.temppath.append(path)
+
+                        # self.scene.temppath.append(path)
+                        # print(f"Current Path(Not eraser): {path}")
+                        # print(f"Existing path: {self.scene.temppath}")
+
+                        # for item in self.scene.items():
+                        #     if isinstance(item, QGraphicsPathItem) and item.path() == path:
+                        #         self.scene.removeItem(item)
+                        pathItem = QGraphicsPathItem(path)
+                        # pathItem = QGraphicsPathItem()
+                        # pathItem.setZValue(1)
+                        # new_z_index = top_z + 10  # Adjust the offset value as needed
+
+                        self.scene.next_z_index += 10  # Adjust increment as needed
+                        pathItem.setZValue(self.scene.next_z_index)
+                        my_pen = QPen(QColor(line_data['color']), line_data['width'])
+                        my_pen.setCapStyle(Qt.PenCapStyle.RoundCap)
+                        pathItem.setPen(my_pen)
+                        # pathItem.setCompositionMode(QPainter.CompositionMode_SourceOver)
+                        pathItem.setZValue(self.scene.itemsBoundingRect().height() + 1)
+                        # pathItem.setCompositionMode(QPainter.CompositionMode_Source)
+                        self.scene.addItem(pathItem)
+
+                        # last_item = self.scene.items()[-1]  # Get the last item added
+                        # if last_item == pathItem and pathItem is not None:
+                        #     self.scene.removeItem(last_item)  # Remove the last item (pathItem)
+            # elif undo_flag is True:
+            #     self.undo()
+        except IndexError as e:
+            print(e)
+            pass
+
 
 def init_gui():
     # binding the signals to specific functions of server
@@ -635,9 +577,7 @@ if __name__ == '__main__':
     start_server(myserver)
     window = MainWindow()
     signal_manager.action_signal.connect(window.scene.get_drawing_events)
-    signal_manager.data_ack.connect(window.scene.build_scene_file)
+    signal_manager.data_ack.connect(window.build_scene_file)
     window.show()
 
-
     app.exec()
-

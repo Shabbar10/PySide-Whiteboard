@@ -93,9 +93,9 @@ class MyServer(QTcpServer):
 
 def start_server(server: MyServer):
     SERVER_IP = get_local_ip()
-    server.listen(QHostAddress(SERVER_IP), 5000)
+    server.listen(QHostAddress(SERVER_IP), 8080)
     if server.isListening():
-        print("Server is listening on port 5000")
+        print("Server is listening on port 8080")
     else:
         print("Server could not start. Error:", server.errorString())
 

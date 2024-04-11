@@ -31,6 +31,7 @@ from client_mg import SignalManager
 from TcpClientNet import start_client, MyClient
 from TcpClientNet import UdpSock
 from WhiteboardApplication.UI.board import Ui_MainWindow
+
 itemTypes = set()
 
 signal_manager = SignalManager()
@@ -39,12 +40,16 @@ signal_manager = SignalManager()
 class User:
     def __init__(self):
         pass
+
+
 class BoardScene(QGraphicsScene):
     def __init__(self):
         super().__init__()
         self.setSceneRect(0, 0, 600, 500)
 
         self.path = None
+        self.mp = None
+        # self.mp = None
         self.previous_position = None
         self.drawing = False
         self.color = QColor("#000000")
@@ -52,9 +57,9 @@ class BoardScene(QGraphicsScene):
         self.pathItem = None
         self.drawn_paths = []
         self.my_pen = None
-        self.data = {"event" : "",
-                     "state" : False,
-                     "path" : None,
+        self.data = {"event": "",
+                     "state": False,
+                     "path": None,
                      "position": None,
                      "color": None,
                      "widthF": None,
@@ -67,6 +72,27 @@ class BoardScene(QGraphicsScene):
                      }
         self.pos = []
         self.jsonpath = None
+        self.default_z_index = 0  # Set a default z-index
+        self.eraser_z_index = None  # Store eraser's z-index
+
+    def get_topmost_z_index(self):
+        highest_z = float("-inf")
+        for item in self.items():
+            highest_z = max(highest_z, item.zValue())
+        return highest_z
+
+    def set_eraser_z_index(self, z_index):
+        self.eraser_z_index = z_index
+        for item in self.items():
+            if isinstance(item, QGraphicsPathItem):
+                if item.pen().color() == Qt.white:
+                    item.setZValue(self.eraser_z_index)
+
+    def set_default_z_index(self):
+        for item in self.items():
+            if isinstance(item, QGraphicsPathItem):
+                if item.pen().color() != Qt.white:
+                    item.setZValue(self.default_z_index)
 
     def change_color(self, color):
         self.color = color
@@ -97,18 +123,18 @@ class BoardScene(QGraphicsScene):
 
             # print(itemTypes)
             self.drawing_events("mousePressEvent")
-            self.send_updates()
+            # self.send_updates()
 
             # print(f"Path original: {self.path}")
-            self.jsonpath = self.serialize_path(self.path)
-
-
+            # self.jsonpath = self.serialize_path(self.path)
+            #
             # new = self.deserialize_path(jsonpath)
 
             # print(f"JSON : {new}")
 
             # print(self.data)
             # itemTypes.clear()
+            signal_manager.function_call.emit(True)
 
     def serialize_path(self, path):
         elements = []
@@ -149,7 +175,7 @@ class BoardScene(QGraphicsScene):
             for item in self.items():
                 itemTypes.add(type(item).__name__)
 
-            # if event.button() == Qt.MouseButton.LeftButton:
+                # if event.button() == Qt.MouseButton.LeftButton:
                 self.drawing_events("mouseMoveEvent")
                 # print(event.buttons())
             # else:
@@ -169,11 +195,14 @@ class BoardScene(QGraphicsScene):
             # print(itemTypes)
             # itemTypes.clear()
 
+            signal_manager.function_call.emit(True)
+
     def mouseReleaseEvent(self, event):
         if event.button() == Qt.MouseButton.LeftButton:
             self.pos.clear()
-            self.pos.append(self.previous_position.y())
-            self.pos.append(self.previous_position.x())
+            if self.previous_position:
+                self.pos.append(self.previous_position.y())
+                self.pos.append(self.previous_position.x())
             self.previous_position = None
             self.drawing = False
             # Save the drawn path
@@ -190,7 +219,7 @@ class BoardScene(QGraphicsScene):
             # itemTypes.clear()
             self.drawing_events("mouseReleaseEvent")
 
-            self.scene_file()
+            # self.scene_file()
             # self.send_updates()
             # print(self.data)
             # print(self.path)
@@ -200,7 +229,7 @@ class BoardScene(QGraphicsScene):
             self.jsonpath = self.serialize_path(self.path)
             # new = self.deserialize_path(jsonpath)
             # print(f"JSON : {new}")
-
+            signal_manager.function_call.emit(True)
 
     def send_updates(self):
         if self.drawing:
@@ -208,7 +237,7 @@ class BoardScene(QGraphicsScene):
             # print(data_to_send)
             # self.drawing_events()
             print("Reached into sending updates")
-            signal_manager.send_info.emit(data_to_send)
+            # signal_manager.send_info.emit(data_to_send)
             data_to_send.clear()
         else:
             pass
@@ -219,6 +248,7 @@ class BoardScene(QGraphicsScene):
     def clear_drawn_paths(self):
         self.drawn_paths = []
         self.clear()
+
     def pen_cap_style_to_string(self, cap_style) -> str:
         # Convert PenCapStyle to string representation
         if cap_style == Qt.PenCapStyle.FlatCap:
@@ -231,19 +261,20 @@ class BoardScene(QGraphicsScene):
             return "FlatCap"  # Default to something
 
     def pen_join_style_to_string(self, join_style):
-            # Convert PenJoinStyle to string representation
-            if join_style == Qt.PenJoinStyle.MiterJoin:
-                return "MiterJoin"
-            elif join_style == Qt.PenJoinStyle.BevelJoin:
-                return "BevelJoin"
-            elif join_style == Qt.PenJoinStyle.RoundJoin:
-                return "RoundJoin"
-            else:
-                return "UnknownJoin"
+        # Convert PenJoinStyle to string representation
+        if join_style == Qt.PenJoinStyle.MiterJoin:
+            return "MiterJoin"
+        elif join_style == Qt.PenJoinStyle.BevelJoin:
+            return "BevelJoin"
+        elif join_style == Qt.PenJoinStyle.RoundJoin:
+            return "RoundJoin"
+        else:
+            return "UnknownJoin"
 
-            ############################################################################################################
+        ############################################################################################################
+
     # PenCapStyle
-    def pen_style_to_string(self,pen_style):
+    def pen_style_to_string(self, pen_style):
         # Convert PenStyle to string representation
         if pen_style == Qt.PenStyle.NoPen:
             return "NoPen"
@@ -264,7 +295,6 @@ class BoardScene(QGraphicsScene):
 
     def drawing_events(self, event_name: str):
         if len(self.pos) >= 2:
-
             color = self.my_pen.color().name()
             cp_style = self.pen_cap_style_to_string(self.my_pen.capStyle())
             join_style = self.pen_join_style_to_string(self.my_pen.joinStyle())
@@ -324,40 +354,38 @@ class BoardScene(QGraphicsScene):
         elif scene_info["event"] == "mouseReleaseEvent" and scene_info["state"] is False:
             pass
 
-
-    def scene_file(self):
-        data = {
-            'lines': [],  # stores info of each line drawn
-            'scene_rect': [self.width(), self.height()],  # stores dimension of scene
-            'color': self.color.name(),  # store the color used
-            'size': self.size  # store the size of the pen
-        }
-        for item in self.items():
-            if isinstance(item, QGraphicsPathItem):
-                line_data = {
-                    'color': item.pen().color().name(),
-                    'width': item.pen().widthF(),
-                    # 'color': self.my_pen.color().name(),
-                    # 'width': self.my_pen.widthF(),
-                    'points': []  # stores the (X,Y) coordinate of the line
-                }
-
-                # Extract points from the path
-                for subpath in item.path().toSubpathPolygons():  # to SubpathPolygons method is used to break down
-                    # the complex line into sub parts and store it
-                    line_data['points'].extend([(point.x(), point.y()) for point in subpath])
-
-                data['lines'].append(line_data)
-        # print(data)
-        signal_manager.data_sig.emit(data)
-
+    # def scene_file(self):
+    #     data = {
+    #         'lines': [],  # stores info of each line drawn
+    #         'scene_rect': [self.width(), self.height()],  # stores dimension of scene
+    #         'color': self.color.name(),  # store the color used
+    #         'size': self.size  # store the size of the pen
+    #     }
+    #     for item in self.items():
+    #         if isinstance(item, QGraphicsPathItem):
+    #             line_data = {
+    #                 'color': item.pen().color().name(),
+    #                 'width': item.pen().widthF(),
+    #                 # 'color': self.my_pen.color().name(),
+    #                 # 'width': self.my_pen.widthF(),
+    #                 'points': []  # stores the (X,Y) coordinate of the line
+    #             }
+    #
+    #             # Extract points from the path
+    #             for subpath in item.path().toSubpathPolygons():  # to SubpathPolygons method is used to break down
+    #                 # the complex line into sub parts and store it
+    #                 line_data['points'].extend([(point.x(), point.y()) for point in subpath])
+    #
+    #             data['lines'].append(line_data)
+    #     # print(data)
+    #     signal_manager.data_sig.emit(data)
 
 
 class MainWindow(QMainWindow, Ui_MainWindow):
     def __init__(self):
         super().__init__()
         self.setupUi(self)
-
+        self.undo_flag = False
         ############################################################################################################
         # Ensure all buttons behave properly when clicked
         self.list_of_buttons = [self.pb_Pen, self.pb_Eraser]
@@ -469,13 +497,26 @@ class MainWindow(QMainWindow, Ui_MainWindow):
     def undo(self):
         if self.scene.items():
             latest_item = self.scene.items()
+            print(self.scene.items())
             self.redo_list.append(latest_item)
             self.scene.removeItem(latest_item[0])
+            signal_manager.function_call.emit(True)
+        # if self.pb_Undo.clicked:
+        #     # print('Clicked')
+        #     self.undo_flag = True
+        #     signal_manager.data_updated.emit(self.undo_flag)
+        #     self.scene_file(self.undo_flag)
+        #     print('removed')
+        # else:
+        #     print('Not Clicked')
+        #     signal_manager.data_updated.emit(False)
 
     def redo(self):
         if self.redo_list:
             item = self.redo_list.pop(-1)
             self.scene.addItem(item[0])
+            signal_manager.function_call.emit(True)
+
 
     def clear_canvas(self):
         self.scene.clear()
@@ -492,21 +533,18 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             self.pb_Eraser.setChecked(False)
             self.pb_Pen.setChecked(True)
 
-
     def color_changed(self, color):
         self.scene.change_color(color)
-        self.scene.scene_file()
+        # self.scene.scene_file()
+        # self.scene_file()
         print(f"Eraser paths : {self.scene.drawn_paths} ")
         # self.erase_path(self.scene.drawn_paths)
-
-
 
     def button_clicked(self):
         sender_button = self.sender()
         for btn in self.list_of_buttons:
             if btn is not sender_button:
                 btn.setChecked(False)
-
 
     def erase_path(self, path):
         for item in self.scene.items():
@@ -515,6 +553,39 @@ class MainWindow(QMainWindow, Ui_MainWindow):
                     self.scene.removeItem(item)
                     break
 
+    def scene_file(self, flag):
+        self.undo_flag = flag
+        data = {
+            'lines': [],  # stores info of each line drawn
+            'scene_rect': [self.scene.width(), self.scene.height()],  # stores dimension of scene
+            'color': self.scene.color.name(),  # store the color used
+            'size': self.scene.size  # store the size of the pen
+        }
+        # self.scene.items().reverse()
+        for item in reversed(self.scene.items()):
+            if isinstance(item, QGraphicsPathItem):
+                line_data = {
+                    'color': item.pen().color().name(),
+                    'width': item.pen().widthF(),
+                    # 'color': self.my_pen.color().name(),
+                    # 'width': self.my_pen.widthF(),
+                    'points': []  # stores the (X,Y) coordinate of the line
+                }
+
+                # Extract points from the path
+                for subpath in item.path().toSubpathPolygons():  # to SubpathPolygons method is used to break down
+                    # the complex line into sub parts and store it
+                    line_data['points'].extend([(point.x(), point.y()) for point in subpath])
+
+                data['lines'].append(line_data)
+        # print(data)
+        signal_manager.data_sig.emit(data, self.undo_flag)
+
+    def track_mouse_event(self, e):
+        if e is True:
+            self.scene_file(False)
+        else:
+            pass
 
 
 def init_gui():
@@ -529,22 +600,23 @@ def init_gui():
     app = QApplication()
     window = MainWindow()
 
-
     client = MyClient()
     start_client(client)
-    signal_manager.send_info.connect(client.ping_server)
+    # signal_manager.send_info.connect(client.ping_server)
     signal_manager.data_sig.connect(client.ping_server)
-
+    signal_manager.function_call.connect(window.track_mouse_event)
+    signal_manager.data_updated.connect(window.scene_file)
 
     window.show()
 
     app.exec()
 
+
 if __name__ == '__main__':
-#     app = QApplication()
-#
-#     window = MainWindow()
-#     window.show()
-#
-#     app.exec()
+    #     app = QApplication()
+    #
+    #     window = MainWindow()
+    #     window.show()
+    #
+    #     app.exec()
     init_gui()

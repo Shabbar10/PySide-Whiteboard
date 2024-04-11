@@ -4,7 +4,7 @@ import json
 
 # Define the server address and port
 SERVER_IP = "192.168.1.3"
-SERVER_PORT = 5000
+SERVER_PORT = 8080
 class MyClient(QTcpSocket):
     def __init__(self):
         super().__init__()
@@ -12,7 +12,8 @@ class MyClient(QTcpSocket):
         # self.connected.connect(self.get_data_from_server)
         # self.readyRead.connect(self.get_data_from_server)
         print("YES")
-
+        self.data_file = {'scene_file' : {},
+                          'flag' : False}
         print("Signal connected")
         # print("NO")
         # self.timer = QTimer(self)
@@ -44,10 +45,17 @@ class MyClient(QTcpSocket):
     #
     #         # self.write(message.encode("utf-8"))
 
-    def ping_server(self, scene_info):
+    def ping_server(self, scene_info, flag):
         # print(scene_info)
+        self.data_file = {
+            'scene_info' : scene_info,
+            'flag' : flag
+        }
+        # print(self.data_file)
         if self.state() == QAbstractSocket.SocketState.ConnectedState:
-            json_dump = json.dumps(scene_info)
+            # json_dump = json.dumps(scene_info)
+            json_dump = json.dumps(self.data_file)
+
             decoded = json_dump.encode('utf-8')
 
             # print(decoded)
@@ -59,8 +67,8 @@ class MyClient(QTcpSocket):
 
 def start_client(client: MyClient):
     # try:
-    client.connectToHost(QHostAddress("192.168.1.7"), 5000)
-    if client.waitForConnected(5000):  # Wait for up to 5 seconds for the connection
+    client.connectToHost(QHostAddress("192.168.1.7"), 8080)
+    if client.waitForConnected(8080):  # Wait for up to 5 seconds for the connection
         print("Connected to the server")
         # client.readyRead.connect(client.ping_server)
         print("T+E")
