@@ -22,12 +22,6 @@ class MyServer(QTcpServer):
         self.client_socket = QTcpSocket()
         self.client_socket.setSocketDescriptor(socket_descriptor)
         self.client_socket.readyRead.connect(self.print_data)
-        # self.client_socket.connected.connect(lambda flag, info: self.channel_broadcast(flag, info))
-        # self.client_socket.connected.connect(self.channel_broadcast)
-
-        # self.timer = QTimer(self)
-        # self.timer.timeout.connect(lambda: self.channel_broadcast(0, {}))
-        # self.timer.start(4000)
 
         self.client_socket.disconnected.connect(self.client_disconnected)
         self.client_address = self.client_socket.peerAddress().toString()
@@ -42,22 +36,11 @@ class MyServer(QTcpServer):
             )
             try:
                 decoded_data = data_received.decode('utf-8').splitlines()
-                # print(decoded_data[0])
-                # if decoded_data.strip():
-                #     received_dict = json.loads(decoded_data)
-                #     signal_manager.action_signal.emit(received_dict)
-                #     print(received_dict)
                 received_dict = json.loads(decoded_data[0])
-                # json_serialized_path = self.deserialize_path(received_dict["path"])
-                #
-                # received_dict["path"] = json_serialized_path
-                # print(json_serialized_path)
                 signal_manager.data_ack.emit(received_dict)
-                # print(received_dict)
 
             except json.JSONDecodeError:
                 print(f"Error decoding JSON: {data_received.decode('utf-8')}")
-
 
     def serialize_path(self, path):
         elements = []
@@ -78,17 +61,12 @@ class MyServer(QTcpServer):
                 path.moveTo(*element[1])
             elif element[0] == 'lineTo':
                 path.lineTo(*element[1])
-            # Add more cases for other types like CubicToElement, etc.
         return path
 
     def client_disconnected(self):
         print(f"Client {self.client_address} disconnected.")
 
-        # Allow the event loop to process events
         QCoreApplication.processEvents()
-
-
-# server = myServer()
 
 
 def start_server(server: MyServer):
@@ -98,15 +76,3 @@ def start_server(server: MyServer):
         print("Server is listening on port 8080")
     else:
         print("Server could not start. Error:", server.errorString())
-
-
-# if __name__ == "__main__":
-#     app = QApplication([])
-#
-#     server.listen(QHostAddress("192.168.1.4"), 5000)
-#     if server.isListening():
-#         print("Server is listening on port 5000")
-#     else:
-#         print("Server could not start. Error:", server.errorString())
-#
-#     app.exec()

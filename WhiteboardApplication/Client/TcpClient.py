@@ -29,7 +29,6 @@ from PySide6.QtCore import (
 import json
 from client_mg import SignalManager
 from TcpClientNet import start_client, MyClient
-from TcpClientNet import UdpSock
 from WhiteboardApplication.UI.board import Ui_MainWindow
 
 itemTypes = set()
@@ -215,29 +214,15 @@ class BoardScene(QGraphicsScene):
             for item in self.items():
                 itemTypes.add(type(item).__name__)
 
-            # print(itemTypes)
-            # itemTypes.clear()
             self.drawing_events("mouseReleaseEvent")
 
-            # self.scene_file()
-            # self.send_updates()
-            # print(self.data)
-            # print(self.path)
-
-            # print(f"Path original: {self.path}")
-
             self.jsonpath = self.serialize_path(self.path)
-            # new = self.deserialize_path(jsonpath)
-            # print(f"JSON : {new}")
             signal_manager.function_call.emit(True)
 
     def send_updates(self):
         if self.drawing:
             data_to_send = self.data
-            # print(data_to_send)
-            # self.drawing_events()
             print("Reached into sending updates")
-            # signal_manager.send_info.emit(data_to_send)
             data_to_send.clear()
         else:
             pass
@@ -353,32 +338,6 @@ class BoardScene(QGraphicsScene):
 
         elif scene_info["event"] == "mouseReleaseEvent" and scene_info["state"] is False:
             pass
-
-    # def scene_file(self):
-    #     data = {
-    #         'lines': [],  # stores info of each line drawn
-    #         'scene_rect': [self.width(), self.height()],  # stores dimension of scene
-    #         'color': self.color.name(),  # store the color used
-    #         'size': self.size  # store the size of the pen
-    #     }
-    #     for item in self.items():
-    #         if isinstance(item, QGraphicsPathItem):
-    #             line_data = {
-    #                 'color': item.pen().color().name(),
-    #                 'width': item.pen().widthF(),
-    #                 # 'color': self.my_pen.color().name(),
-    #                 # 'width': self.my_pen.widthF(),
-    #                 'points': []  # stores the (X,Y) coordinate of the line
-    #             }
-    #
-    #             # Extract points from the path
-    #             for subpath in item.path().toSubpathPolygons():  # to SubpathPolygons method is used to break down
-    #                 # the complex line into sub parts and store it
-    #                 line_data['points'].extend([(point.x(), point.y()) for point in subpath])
-    #
-    #             data['lines'].append(line_data)
-    #     # print(data)
-    #     signal_manager.data_sig.emit(data)
 
 
 class MainWindow(QMainWindow, Ui_MainWindow):
@@ -501,15 +460,6 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             self.redo_list.append(latest_item)
             self.scene.removeItem(latest_item[0])
             signal_manager.function_call.emit(True)
-        # if self.pb_Undo.clicked:
-        #     # print('Clicked')
-        #     self.undo_flag = True
-        #     signal_manager.data_updated.emit(self.undo_flag)
-        #     self.scene_file(self.undo_flag)
-        #     print('removed')
-        # else:
-        #     print('Not Clicked')
-        #     signal_manager.data_updated.emit(False)
 
     def redo(self):
         if self.redo_list:
@@ -589,20 +539,11 @@ class MainWindow(QMainWindow, Ui_MainWindow):
 
 
 def init_gui():
-    # start_server(server)
-
-    # For client side
-    # binding the signals to specific functions of server
-    # signal_manager.send_info.connect(server.broadcast)
-    # signal_manager.action_signal.connect(server.channel_broadcast)
-
-    # Client side connections
     app = QApplication()
     window = MainWindow()
 
     client = MyClient()
     start_client(client)
-    # signal_manager.send_info.connect(client.ping_server)
     signal_manager.data_sig.connect(client.ping_server)
     signal_manager.function_call.connect(window.track_mouse_event)
     signal_manager.data_updated.connect(window.scene_file)
@@ -613,10 +554,4 @@ def init_gui():
 
 
 if __name__ == '__main__':
-    #     app = QApplication()
-    #
-    #     window = MainWindow()
-    #     window.show()
-    #
-    #     app.exec()
     init_gui()
