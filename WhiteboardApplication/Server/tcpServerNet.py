@@ -4,7 +4,7 @@ from PySide6.QtGui import QPainterPath
 from PySide6.QtNetwork import QTcpServer, QTcpSocket, QHostAddress, QAbstractSocket
 import json
 from netManage import SignalManager
-from getip import  get_local_ip
+from getip import  get_local_ip, get_ipv6_address
 signal_manager = SignalManager()
 
 
@@ -70,7 +70,7 @@ class MyServer(QTcpServer):
 
 
 def start_server(server: MyServer):
-    SERVER_IP = get_local_ip()
+    SERVER_IP = get_ipv6_address()
     server.listen(QHostAddress(SERVER_IP), 8080)
     if server.isListening():
         print("Server is listening on port 8080")

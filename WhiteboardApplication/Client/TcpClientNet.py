@@ -1,9 +1,22 @@
-from PySide6.QtNetwork import QUdpSocket, QHostAddress, QTcpSocket, QAbstractSocket
-from PySide6.QtCore import QByteArray, QCoreApplication, QTimer
-import json, socket
+import json
+import socket
 
-host = socket.gethostname()
-local_ip = socket.gethostbyname(host)
+from PySide6.QtNetwork import QHostAddress, QTcpSocket, QAbstractSocket
+
+
+def get_ipv6_address():
+    s = socket.socket(socket.AF_INET6, socket.SOCK_DGRAM)
+
+    try:
+        s.connect(("ipv6.google.com", 80))
+        global_ipv6_address = s.getsockname()[0]
+
+        return global_ipv6_address
+    except Exception as e:
+        print("Error:", e)
+    finally:
+        s.close()
+
 
 class MyClient(QTcpSocket):
     def __init__(self):
@@ -35,8 +48,8 @@ class MyClient(QTcpSocket):
 
 
 def start_client(client: MyClient):
-    # try:
-    client.connectToHost(QHostAddress(local_ip), 8080)
+    ip = get_ipv6_address()
+    client.connectToHost(QHostAddress(ip), 8080)
     if client.waitForConnected(8080):  # Wait for up to 5 seconds for the connection
         print("Connected to the server")
         # client.readyRead.connect(client.ping_server)
