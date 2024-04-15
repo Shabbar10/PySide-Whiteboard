@@ -425,7 +425,6 @@ class MainWindow(QMainWindow, Ui_MainWindow):
                 if 'size' in scene_file.keys():
                     self.scene.change_size(scene_file['size'])
                     prev = scene_file
-
                 else:
                     pass
                 # Add lines to the scene
@@ -433,15 +432,17 @@ class MainWindow(QMainWindow, Ui_MainWindow):
                     for line_data in scene_file['lines']:
                         path = QPainterPath()
                         path.moveTo(line_data['points'][0][0], line_data['points'][0][1])
+                        print("line_data is cool")
 
                         for subpath in line_data['points'][1:]:
                             path.lineTo(subpath[0], subpath[1])
+                        print("Whatever tf subpath is, it's cool")
 
                         self.scene.temppath.clear()
 
                         if path not in self.scene.temppath:
                             self.scene.temppath.append(path)
-
+                        print(3)
                         pathItem = QGraphicsPathItem(path)
                         self.scene.next_z_index += 10  # Adjust increment as needed
                         pathItem.setZValue(self.scene.next_z_index)
