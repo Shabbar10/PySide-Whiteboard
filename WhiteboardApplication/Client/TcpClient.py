@@ -27,18 +27,10 @@ from PySide6.QtCore import (
     Signal
 )
 import json
-from client_mg import SignalManager
-from TcpClientNet import start_client, MyClient
+from TcpClientNet import start_client, MyClient, signal_manager
 from WhiteboardApplication.UI.board import Ui_MainWindow
 
 itemTypes = set()
-
-signal_manager = SignalManager()
-
-
-class User:
-    def __init__(self):
-        pass
 
 
 class BoardScene(QGraphicsScene):
@@ -48,7 +40,6 @@ class BoardScene(QGraphicsScene):
 
         self.path = None
         self.mp = None
-        # self.mp = None
         self.previous_position = None
         self.drawing = False
         self.color = QColor("#000000")
@@ -56,42 +47,7 @@ class BoardScene(QGraphicsScene):
         self.pathItem = None
         self.drawn_paths = []
         self.my_pen = None
-        self.data = {"event": "",
-                     "state": False,
-                     "path": None,
-                     "position": None,
-                     "color": None,
-                     "widthF": None,
-                     "width": None,
-                     "capStyle": None,
-                     "joinStyle": None,
-                     "style": None,
-                     "pattern": None,
-                     "patternOffset": None
-                     }
         self.pos = []
-        self.jsonpath = None
-        self.default_z_index = 0  # Set a default z-index
-        self.eraser_z_index = None  # Store eraser's z-index
-
-    def get_topmost_z_index(self):
-        highest_z = float("-inf")
-        for item in self.items():
-            highest_z = max(highest_z, item.zValue())
-        return highest_z
-
-    def set_eraser_z_index(self, z_index):
-        self.eraser_z_index = z_index
-        for item in self.items():
-            if isinstance(item, QGraphicsPathItem):
-                if item.pen().color() == Qt.white:
-                    item.setZValue(self.eraser_z_index)
-
-    def set_default_z_index(self):
-        for item in self.items():
-            if isinstance(item, QGraphicsPathItem):
-                if item.pen().color() != Qt.white:
-                    item.setZValue(self.default_z_index)
 
     def change_color(self, color):
         self.color = color
@@ -107,55 +63,17 @@ class BoardScene(QGraphicsScene):
             self.previous_position = event.scenePos()
             self.path.moveTo(self.previous_position)
             self.pathItem = QGraphicsPathItem()
+
             self.my_pen = QPen(self.color, self.size)
             self.my_pen.setCapStyle(Qt.PenCapStyle.RoundCap)
+
             self.pathItem.setPen(self.my_pen)
             self.addItem(self.pathItem)
 
             self.pos.append(self.previous_position.y())
             self.pos.append(self.previous_position.x())
-            # self.pos.clear()
 
-            # print(self.items())
-            for item in self.items():
-                itemTypes.add(type(item).__name__)
-
-            # print(itemTypes)
-            self.drawing_events("mousePressEvent")
-            # self.send_updates()
-
-            # print(f"Path original: {self.path}")
-            # self.jsonpath = self.serialize_path(self.path)
-            #
-            # new = self.deserialize_path(jsonpath)
-
-            # print(f"JSON : {new}")
-
-            # print(self.data)
-            # itemTypes.clear()
             signal_manager.function_call.emit(True)
-
-    def serialize_path(self, path):
-        elements = []
-        for i in range(path.elementCount()):
-            element_type = path.elementAt(i).type
-            if element_type == QPainterPath.MoveToElement:
-                elements.append(('moveTo', (path.elementAt(i).x, path.elementAt(i).y)))
-            elif element_type == QPainterPath.LineToElement:
-                elements.append(('lineTo', (path.elementAt(i).x, path.elementAt(i).y)))
-            # Add more cases for other types like CubicToElement, etc.
-        return json.dumps(elements)
-
-    def deserialize_path(self, serialized_data):
-        path = QPainterPath()
-        elements = json.loads(serialized_data)
-        for element in elements:
-            if element[0] == 'moveTo':
-                path.moveTo(*element[1])
-            elif element[0] == 'lineTo':
-                path.lineTo(*element[1])
-            # Add more cases for other types like CubicToElement, etc.
-        return path
 
     def mouseMoveEvent(self, event):
         if self.drawing:
@@ -165,34 +83,8 @@ class BoardScene(QGraphicsScene):
             self.path.lineTo(curr_position)
             self.pathItem.setPath(self.path)
             self.previous_position = curr_position
-            # print(self.pathItem)
-            # print(self.items())
             self.pos.append(self.previous_position.y())
             self.pos.append(self.previous_position.x())
-
-            # self.pos.clear()
-            for item in self.items():
-                itemTypes.add(type(item).__name__)
-
-                # if event.button() == Qt.MouseButton.LeftButton:
-                self.drawing_events("mouseMoveEvent")
-                # print(event.buttons())
-            # else:
-            #     self.drawing_events("mouseReleaseEvent")
-
-            # print(self.path)
-
-            # self.send_updates()
-            # print(f"Path original: {self.path}")
-            self.jsonpath = self.serialize_path(self.path)
-            # new = self.deserialize_path(jsonpath)
-
-            # print(f"JSON : {new}")
-
-            # print(self.data)
-
-            # print(itemTypes)
-            # itemTypes.clear()
 
             signal_manager.function_call.emit(True)
 
@@ -206,26 +98,8 @@ class BoardScene(QGraphicsScene):
             self.drawing = False
             # Save the drawn path
             self.drawn_paths.append(self.path)
-            # print(self.pathItem)
-            # print(self.items())
 
-            # self.pos.clear()
-
-            for item in self.items():
-                itemTypes.add(type(item).__name__)
-
-            self.drawing_events("mouseReleaseEvent")
-
-            self.jsonpath = self.serialize_path(self.path)
             signal_manager.function_call.emit(True)
-
-    def send_updates(self):
-        if self.drawing:
-            data_to_send = self.data
-            print("Reached into sending updates")
-            data_to_send.clear()
-        else:
-            pass
 
     def get_drawn_paths(self):
         return self.drawn_paths
@@ -233,111 +107,6 @@ class BoardScene(QGraphicsScene):
     def clear_drawn_paths(self):
         self.drawn_paths = []
         self.clear()
-
-    def pen_cap_style_to_string(self, cap_style) -> str:
-        # Convert PenCapStyle to string representation
-        if cap_style == Qt.PenCapStyle.FlatCap:
-            return "FlatCap"
-        elif cap_style == Qt.PenCapStyle.SquareCap:
-            return "SquareCap"
-        elif cap_style == Qt.PenCapStyle.RoundCap:
-            return "RoundCap"
-        else:
-            return "FlatCap"  # Default to something
-
-    def pen_join_style_to_string(self, join_style):
-        # Convert PenJoinStyle to string representation
-        if join_style == Qt.PenJoinStyle.MiterJoin:
-            return "MiterJoin"
-        elif join_style == Qt.PenJoinStyle.BevelJoin:
-            return "BevelJoin"
-        elif join_style == Qt.PenJoinStyle.RoundJoin:
-            return "RoundJoin"
-        else:
-            return "UnknownJoin"
-
-        ############################################################################################################
-
-    # PenCapStyle
-    def pen_style_to_string(self, pen_style):
-        # Convert PenStyle to string representation
-        if pen_style == Qt.PenStyle.NoPen:
-            return "NoPen"
-        elif pen_style == Qt.PenStyle.SolidLine:
-            return "SolidLine"
-        elif pen_style == Qt.PenStyle.DashLine:
-            return "DashLine"
-        elif pen_style == Qt.PenStyle.DotLine:
-            return "DotLine"
-        elif pen_style == Qt.PenStyle.DashDotLine:
-            return "DashDotLine"
-        elif pen_style == Qt.PenStyle.DashDotDotLine:
-            return "DashDotDotLine"
-        elif pen_style == Qt.PenStyle.CustomDashLine:
-            return "CustomDashLine"
-        else:
-            return "UnknownPenStyle"
-
-    def drawing_events(self, event_name: str):
-        if len(self.pos) >= 2:
-            color = self.my_pen.color().name()
-            cp_style = self.pen_cap_style_to_string(self.my_pen.capStyle())
-            join_style = self.pen_join_style_to_string(self.my_pen.joinStyle())
-            style = self.pen_style_to_string(self.my_pen.style())
-            position = (self.pos[1], self.pos[0])
-
-            self.data["path"] = self.jsonpath
-            self.data["state"] = self.drawing
-            self.data["event"] = event_name
-            self.data["position"] = position
-            self.data["color"] = color
-            self.data["widthF"] = self.my_pen.widthF()
-            self.data["width"] = self.my_pen.width()
-            self.data["capStyle"] = cp_style
-            self.data["joinStyle"] = join_style
-            self.data["style"] = style
-            self.data["pattern"] = self.my_pen.dashPattern()
-            self.data["patternOffset"] = self.my_pen.dashOffset()
-
-    def get_drawing_events(self, scene_info):
-        self.path = QPainterPath()
-        self.pathItem = QGraphicsPathItem()
-        point = QPointF(scene_info["position"][0], scene_info["position"][1])
-        if scene_info["event"] == "mousePressEvent" and scene_info["state"] is False:
-            self.path = QPainterPath()
-            color = QColor(scene_info["color"])
-            size = scene_info["width"]
-            pattern = scene_info["pattern"]
-
-            style = getattr(Qt.PenStyle, scene_info["style"])
-
-            self.my_pen = QPen(color, size)
-            self.my_pen.setStyle(style)
-            self.my_pen.setDashPattern(scene_info["pattern"])
-            self.path.moveTo(point)
-            self.pathItem.setPen(self.my_pen)
-            self.pathItem.setPath(self.path)
-
-            self.addItem(self.pathItem)
-
-        elif scene_info["state"] is True and scene_info["event"] == "mouseMoveEvent":
-            self.path.lineTo(point)
-            color = QColor(scene_info["color"])
-            size = scene_info["width"]
-            pattern = scene_info["pattern"]
-
-            style = getattr(Qt.PenStyle, scene_info["style"])
-
-            self.my_pen = QPen(color, size)
-            self.my_pen.setStyle(style)
-            self.my_pen.setDashPattern(scene_info["pattern"])
-            self.pathItem.setPen(self.my_pen)
-            self.pathItem.setPath(self.path)
-
-            self.addItem(self.pathItem)
-
-        elif scene_info["event"] == "mouseReleaseEvent" and scene_info["state"] is False:
-            pass
 
 
 class MainWindow(QMainWindow, Ui_MainWindow):
@@ -358,8 +127,8 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         ############################################################################################################
 
         self.actionClear.triggered.connect(self.clear_canvas)
-        self.actionCoolDude.triggered.connect(self.New_file)
-        self.actionClose_2.triggered.connect(self.Close_window)
+        self.actionCoolDude.triggered.connect(self.new_file)
+        self.actionClose_2.triggered.connect(self.close_window)
         self.actionSave_As.triggered.connect(self.save_file)
         self.actionNew_3.triggered.connect(self.load_file)
 
@@ -443,10 +212,10 @@ class MainWindow(QMainWindow, Ui_MainWindow):
 
                 self.scene.addItem(pathItem)
 
-    def Close_window(self):
+    def close_window(self):
         self.close()
 
-    def New_file(self):
+    def new_file(self):
         new_file = MainWindow()
         new_file.show()
 
@@ -466,7 +235,6 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             item = self.redo_list.pop(-1)
             self.scene.addItem(item[0])
             signal_manager.function_call.emit(True)
-
 
     def clear_canvas(self):
         self.scene.clear()
@@ -511,14 +279,12 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             'color': self.scene.color.name(),  # store the color used
             'size': self.scene.size  # store the size of the pen
         }
-        # self.scene.items().reverse()
+
         for item in reversed(self.scene.items()):
             if isinstance(item, QGraphicsPathItem):
                 line_data = {
                     'color': item.pen().color().name(),
                     'width': item.pen().widthF(),
-                    # 'color': self.my_pen.color().name(),
-                    # 'width': self.my_pen.widthF(),
                     'points': []  # stores the (X,Y) coordinate of the line
                 }
 
@@ -530,6 +296,57 @@ class MainWindow(QMainWindow, Ui_MainWindow):
                 data['lines'].append(line_data)
         # print(data)
         signal_manager.data_sig.emit(data, self.undo_flag)
+
+    def build_scene_file(self, data):
+        print("BUILDING FILE")
+        # self.scene.clear()
+        scene_file = data['scene_info']
+
+        undo_flag = data['flag']
+
+        self.scene.drawing = True
+        prev = {'lines': [],  # stores info of each line drawn
+                'scene_rect': [],  # stores dimension of scene
+                'color': "",  # store the color used
+                'size': 20  # store the size of the pen
+                }
+
+        try:
+            if 'scene_info' in data:
+                if 'scene_rect' in scene_file:
+                    scene_rect = scene_file['scene_rect']
+                    self.scene.setSceneRect(0, 0, scene_rect[0], scene_rect[1])
+                else:
+                    # Provide default scene rectangle if 'scene_rect' key is missing
+                    self.scene.setSceneRect(0, 0, 600, 500)  # Adjust the default values as needed
+                self.scene.change_color(QColor(scene_file['color']))
+                self.scene.color.setAlpha(255)
+
+                if 'size' in scene_file.keys():
+                    self.scene.change_size(scene_file['size'])
+                    prev = scene_file
+                else:
+                    pass
+                # Add lines to the scene
+                if 'lines' in scene_file:
+                    for line_data in scene_file['lines']:
+                        path = QPainterPath()
+                        path.moveTo(line_data['points'][0][0], line_data['points'][0][1])
+                        print("line_data is cool")
+
+                        for subpath in line_data['points'][1:]:
+                            path.lineTo(subpath[0], subpath[1])
+                        print("Whatever tf subpath is, it's cool")
+
+                        pathItem = QGraphicsPathItem(path)
+                        my_pen = QPen(QColor(line_data['color']), line_data['width'])
+                        my_pen.setCapStyle(Qt.PenCapStyle.RoundCap)
+                        pathItem.setPen(my_pen)
+                        self.scene.addItem(pathItem)
+
+        except IndexError as e:
+            print(e)
+            pass
 
     def track_mouse_event(self, e):
         if e is True:
@@ -547,6 +364,7 @@ def init_gui():
     signal_manager.data_sig.connect(client.ping_server)
     signal_manager.function_call.connect(window.track_mouse_event)
     signal_manager.data_updated.connect(window.scene_file)
+    signal_manager.data_ack.connect(window.build_scene_file)
 
     window.show()
 

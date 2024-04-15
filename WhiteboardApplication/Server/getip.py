@@ -14,6 +14,7 @@ def get_ipv6_address():
         s.connect(("ipv6.google.com", 80))
         global_ipv6_address = s.getsockname()[0]
 
+        print(f"Global IPv6 address: {global_ipv6_address}")
         return global_ipv6_address
     except Exception as e:
         print("Error:", e)

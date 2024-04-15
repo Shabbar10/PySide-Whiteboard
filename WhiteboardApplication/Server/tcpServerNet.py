@@ -1,4 +1,4 @@
-from PySide6.QtCore import QCoreApplication, QTimer, Signal
+from PySide6.QtCore import QCoreApplication, QTimer, Signal, QDataStream
 from PySide6.QtWidgets import QApplication
 from PySide6.QtGui import QPainterPath
 from PySide6.QtNetwork import QTcpServer, QTcpSocket, QHostAddress, QAbstractSocket
@@ -21,47 +21,37 @@ class MyServer(QTcpServer):
         print("yes\n")
         self.client_socket = QTcpSocket()
         self.client_socket.setSocketDescriptor(socket_descriptor)
-        self.client_socket.readyRead.connect(self.print_data)
+        self.client_socket.readyRead.connect(lambda: self.print_data(self.client_socket))
 
         self.client_socket.disconnected.connect(self.client_disconnected)
         self.client_address = self.client_socket.peerAddress().toString()
         print(f"Client connected from {self.client_address}")
 
-    def print_data(self):
-        # if self.client_socket.state() == QAbstractSocket.SocketState.ConnectedState:
+    def print_data(self, socket):
         while self.client_socket.bytesAvailable() > 0:
             data_received = self.client_socket.readAll().data()
-            print(
-                # f"Received data from {self.client_socket.peerAddress().toString()}: {data_received.decode('utf-8')}"
-            )
             try:
-                decoded_data = data_received.decode('utf-8').splitlines()
-                received_dict = json.loads(decoded_data[0])
-                signal_manager.data_ack.emit(received_dict)
+                decoded_data = data_received.decode('utf-8')
+                print(f"Size of decoded data is {decoded_data.__sizeof__()}")
+                if decoded_data[0] == '{':
+                    for i in range(len(decoded_data)):
+                        if decoded_data[i] == '}' and (i+1) != len(decoded_data):
+                            if decoded_data[i+1] == '{':
+                                end_index = i+1
+                                decoded_data = decoded_data[:end_index]
+                                break
 
-            except json.JSONDecodeError:
+                    received_dict = json.loads(decoded_data)
+                    signal_manager.data_ack.emit(received_dict)
+
+            except json.JSONDecodeError as e:
+                '''
                 print(f"Error decoding JSON: {data_received.decode('utf-8')}")
-
-    def serialize_path(self, path):
-        elements = []
-        for i in range(path.elementCount()):
-            element_type = path.elementAt(i).type
-            if element_type == QPainterPath.MoveToElement:
-                elements.append(('moveTo', (path.elementAt(i).x, path.elementAt(i).y)))
-            elif element_type == QPainterPath.LineToElement:
-                elements.append(('lineTo', (path.elementAt(i).x, path.elementAt(i).y)))
-            # Add more cases for other types like CubicToElement, etc.
-        return json.dumps(elements)
-
-    def deserialize_path(self, serialized_data):
-        path = QPainterPath()
-        elements = json.loads(serialized_data)
-        for element in elements:
-            if element[0] == 'moveTo':
-                path.moveTo(*element[1])
-            elif element[0] == 'lineTo':
-                path.lineTo(*element[1])
-        return path
+                print(f"Error msg: {e.msg}")
+                print(f"Input document: {e.doc}")
+                print(f"Position in document: {e.pos}")
+                '''
+                pass
 
     def client_disconnected(self):
         print(f"Client {self.client_address} disconnected.")
@@ -70,9 +60,9 @@ class MyServer(QTcpServer):
 
 
 def start_server(server: MyServer):
-    SERVER_IP = get_ipv6_address()
+    SERVER_IP = get_local_ip()
     server.listen(QHostAddress(SERVER_IP), 8080)
     if server.isListening():
-        print("Server is listening on port 8080")
+        print("Server is listening on port 8080", SERVER_IP)
     else:
         print("Server could not start. Error:", server.errorString())
