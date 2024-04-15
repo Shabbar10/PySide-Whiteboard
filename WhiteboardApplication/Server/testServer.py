@@ -1,5 +1,5 @@
 import redis
-from PySide6.QtNetwork import QTcpServer, QTcpSocket, QHostAddress, QAbstractSocket
+from PySide6.QtNetwork import QTcpServer, QTcpSocket, QHostAddress
 from getip import get_local_ip
 from netManage import SignalManager
 from PySide6.QtCore import QCoreApplication, Signal

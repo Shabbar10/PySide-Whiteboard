@@ -13,18 +13,10 @@ from PySide6.QtGui import (
     QPainter,
     QPainterPath,
     QColor,
-    QPicture,
-    QPixmap
 )
 
 from PySide6.QtCore import (
     Qt,
-    QIODevice,
-    QFile,
-    QDataStream,
-    QPointF,
-    QObject,
-    Signal
 )
 import json
 from TcpClientNet import start_client, MyClient, signal_manager
@@ -40,6 +32,7 @@ class BoardScene(QGraphicsScene):
 
         self.path = None
         self.mp = None
+        # self.mp = None
         self.previous_position = None
         self.drawing = False
         self.color = QColor("#000000")
@@ -63,16 +56,13 @@ class BoardScene(QGraphicsScene):
             self.previous_position = event.scenePos()
             self.path.moveTo(self.previous_position)
             self.pathItem = QGraphicsPathItem()
-
             self.my_pen = QPen(self.color, self.size)
             self.my_pen.setCapStyle(Qt.PenCapStyle.RoundCap)
-
             self.pathItem.setPen(self.my_pen)
             self.addItem(self.pathItem)
 
             self.pos.append(self.previous_position.y())
             self.pos.append(self.previous_position.x())
-
             signal_manager.function_call.emit(True)
 
     def mouseMoveEvent(self, event):
@@ -96,17 +86,8 @@ class BoardScene(QGraphicsScene):
                 self.pos.append(self.previous_position.x())
             self.previous_position = None
             self.drawing = False
-            # Save the drawn path
-            self.drawn_paths.append(self.path)
 
             signal_manager.function_call.emit(True)
-
-    def get_drawn_paths(self):
-        return self.drawn_paths
-
-    def clear_drawn_paths(self):
-        self.drawn_paths = []
-        self.clear()
 
 
 class MainWindow(QMainWindow, Ui_MainWindow):
@@ -127,10 +108,10 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         ############################################################################################################
 
         self.actionClear.triggered.connect(self.clear_canvas)
-        self.actionCoolDude.triggered.connect(self.new_file)
-        self.actionClose_2.triggered.connect(self.close_window)
+        self.actionNew.triggered.connect(self.New_file)
+        self.actionClose.triggered.connect(self.Close_window)
         self.actionSave_As.triggered.connect(self.save_file)
-        self.actionNew_3.triggered.connect(self.load_file)
+        self.actionOpen.triggered.connect(self.load_file)
 
         # Define what the tool buttons do
         ###########################################################################################################
@@ -212,10 +193,10 @@ class MainWindow(QMainWindow, Ui_MainWindow):
 
                 self.scene.addItem(pathItem)
 
-    def close_window(self):
+    def Close_window(self):
         self.close()
 
-    def new_file(self):
+    def New_file(self):
         new_file = MainWindow()
         new_file.show()
 
@@ -279,12 +260,14 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             'color': self.scene.color.name(),  # store the color used
             'size': self.scene.size  # store the size of the pen
         }
-
+        # self.scene.items().reverse()
         for item in reversed(self.scene.items()):
             if isinstance(item, QGraphicsPathItem):
                 line_data = {
                     'color': item.pen().color().name(),
                     'width': item.pen().widthF(),
+                    # 'color': self.my_pen.color().name(),
+                    # 'width': self.my_pen.widthF(),
                     'points': []  # stores the (X,Y) coordinate of the line
                 }
 
@@ -296,57 +279,6 @@ class MainWindow(QMainWindow, Ui_MainWindow):
                 data['lines'].append(line_data)
         # print(data)
         signal_manager.data_sig.emit(data, self.undo_flag)
-
-    def build_scene_file(self, data):
-        print("BUILDING FILE")
-        # self.scene.clear()
-        scene_file = data['scene_info']
-
-        undo_flag = data['flag']
-
-        self.scene.drawing = True
-        prev = {'lines': [],  # stores info of each line drawn
-                'scene_rect': [],  # stores dimension of scene
-                'color': "",  # store the color used
-                'size': 20  # store the size of the pen
-                }
-
-        try:
-            if 'scene_info' in data:
-                if 'scene_rect' in scene_file:
-                    scene_rect = scene_file['scene_rect']
-                    self.scene.setSceneRect(0, 0, scene_rect[0], scene_rect[1])
-                else:
-                    # Provide default scene rectangle if 'scene_rect' key is missing
-                    self.scene.setSceneRect(0, 0, 600, 500)  # Adjust the default values as needed
-                self.scene.change_color(QColor(scene_file['color']))
-                self.scene.color.setAlpha(255)
-
-                if 'size' in scene_file.keys():
-                    self.scene.change_size(scene_file['size'])
-                    prev = scene_file
-                else:
-                    pass
-                # Add lines to the scene
-                if 'lines' in scene_file:
-                    for line_data in scene_file['lines']:
-                        path = QPainterPath()
-                        path.moveTo(line_data['points'][0][0], line_data['points'][0][1])
-                        print("line_data is cool")
-
-                        for subpath in line_data['points'][1:]:
-                            path.lineTo(subpath[0], subpath[1])
-                        print("Whatever tf subpath is, it's cool")
-
-                        pathItem = QGraphicsPathItem(path)
-                        my_pen = QPen(QColor(line_data['color']), line_data['width'])
-                        my_pen.setCapStyle(Qt.PenCapStyle.RoundCap)
-                        pathItem.setPen(my_pen)
-                        self.scene.addItem(pathItem)
-
-        except IndexError as e:
-            print(e)
-            pass
 
     def track_mouse_event(self, e):
         if e is True:
@@ -364,7 +296,6 @@ def init_gui():
     signal_manager.data_sig.connect(client.ping_server)
     signal_manager.function_call.connect(window.track_mouse_event)
     signal_manager.data_updated.connect(window.scene_file)
-    signal_manager.data_ack.connect(window.build_scene_file)
 
     window.show()
 
