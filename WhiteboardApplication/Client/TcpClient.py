@@ -110,8 +110,8 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         ############################################################################################################
 
         self.actionClear.triggered.connect(self.clear_canvas)
-        self.actionNew.triggered.connect(self.New_file)
-        self.actionClose.triggered.connect(self.Close_window)
+        self.actionNew.triggered.connect(self.new_file)
+        self.actionClose.triggered.connect(self.close_window)
         self.actionSave_As.triggered.connect(self.save_file)
         self.actionOpen.triggered.connect(self.load_file)
 
@@ -195,10 +195,10 @@ class MainWindow(QMainWindow, Ui_MainWindow):
 
                 self.scene.addItem(pathItem)
 
-    def Close_window(self):
+    def close_window(self):
         self.close()
 
-    def New_file(self):
+    def new_file(self):
         new_file = MainWindow()
         new_file.show()
 
@@ -208,7 +208,6 @@ class MainWindow(QMainWindow, Ui_MainWindow):
     def undo(self):
         if self.scene.items():
             latest_item = self.scene.items()
-            print(self.scene.items())
             self.redo_list.append(latest_item)
             self.scene.removeItem(latest_item[0])
             signal_manager.function_call.emit(True)
@@ -238,7 +237,6 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.scene.change_color(color)
         # self.scene.scene_file()
         # self.scene_file()
-        print(f"Eraser paths : {self.scene.drawn_paths} ")
         # self.erase_path(self.scene.drawn_paths)
 
     def button_clicked(self):
@@ -264,11 +262,15 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         }
 
         list_size = len(self.scene.items())
+        print(f"List size is {list_size}")
         global g_length
-        reversed_items = self.scene.items()[:g_length:-1]  # Only take stuff that is newly added since the last time
+        reversed_items = self.scene.items()[::-1]  # Only take stuff that is newly added since the last time
+        new_items = reversed_items[0:g_length]
+        print(f"g_length before is {g_length}")
         g_length = list_size
-        for item_index in range(list_size):
-            item = reversed_items[item_index]
+        print(f"g_length after is {g_length}")
+        for item_index in range(len(new_items)):
+            item = new_items[item_index]
             if isinstance(item, QGraphicsPathItem):
                 line_data = {
                     'color': item.pen().color().name(),
@@ -318,12 +320,9 @@ class MainWindow(QMainWindow, Ui_MainWindow):
                     for line_data in scene_file['lines']:
                         path = QPainterPath()
                         path.moveTo(line_data['points'][0][0], line_data['points'][0][1])
-                        print("line_data is cool")
 
                         for subpath in line_data['points'][1:]:
                             path.lineTo(subpath[0], subpath[1])
-                        print("Whatever tf subpath is, it's cool")
-
 
                         pathItem = QGraphicsPathItem(path)
                         my_pen = QPen(QColor(line_data['color']), line_data['width'])
@@ -334,7 +333,6 @@ class MainWindow(QMainWindow, Ui_MainWindow):
 
         except IndexError as e:
             print(e)
-            pass
 
     def track_mouse_event(self, e):
         if e is True:
