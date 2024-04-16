@@ -59,22 +59,18 @@ class MyClient(QTcpSocket):
                             break
 
                 received_dict = json.loads(decoded_data)
-                print(f"Received_dict is {received_dict}")
                 signal_manager.data_ack.emit(received_dict)
 
         except json.JSONDecodeError as e:
             pass
-            '''
-            print(f"Error decoding JSON: {data.decode('utf-8')}")
             print(f"Error msg: {e.msg}")
             print(f"Input document: {e.doc}")
             print(f"Position in document: {e.pos}")
-            '''
 
 
 def start_client(client: MyClient):
     # ip = get_ipv6_address()
-    client.connectToHost(QHostAddress("192.168.112.204"), 8080)
+    client.connectToHost(QHostAddress("192.168.1.11"), 8080)
     if client.waitForConnected(8080):  # Wait for up to 5 seconds for the connection
         print("Connected to the server")
         # client.readyRead.connect(client.ping_server)

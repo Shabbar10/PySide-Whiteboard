@@ -65,7 +65,7 @@ class BoardScene(QGraphicsScene):
 
             self.pos.append(self.previous_position.y())
             self.pos.append(self.previous_position.x())
-            signal_manager.function_call.emit(True)
+            # signal_manager.function_call.emit(True)
 
     def mouseMoveEvent(self, event):
         if self.drawing:
@@ -78,7 +78,7 @@ class BoardScene(QGraphicsScene):
             self.pos.append(self.previous_position.y())
             self.pos.append(self.previous_position.x())
 
-            signal_manager.function_call.emit(True)
+            # signal_manager.function_call.emit(True)
 
     def mouseReleaseEvent(self, event):
         if event.button() == Qt.MouseButton.LeftButton:
@@ -90,6 +90,8 @@ class BoardScene(QGraphicsScene):
             self.drawing = False
 
             signal_manager.function_call.emit(True)
+            global g_length
+            g_length += 1
 
 
 class MainWindow(QMainWindow, Ui_MainWindow):
@@ -262,16 +264,14 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         }
 
         list_size = len(self.scene.items())
-        print(f"List size is {list_size}")
         global g_length
         reversed_items = self.scene.items()[::-1]  # Only take stuff that is newly added since the last time
         if g_length != 0:
             new_items = reversed_items[g_length:]
         else:
             new_items = reversed_items
-        print(f"g_length before is {g_length}")
-        g_length = list_size
-        print(f"g_length after is {g_length}")
+        print(f"All items: {self.scene.items()}")
+        print(f"New items: {new_items}")
         for item_index in range(len(new_items)):
             item = new_items[item_index]
             if isinstance(item, QGraphicsPathItem):
