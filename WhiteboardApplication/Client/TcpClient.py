@@ -24,6 +24,8 @@ from WhiteboardApplication.UI.board import Ui_MainWindow
 
 itemTypes = set()
 
+g_length = 0
+
 
 class BoardScene(QGraphicsScene):
     def __init__(self):
@@ -260,14 +262,17 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             'color': self.scene.color.name(),  # store the color used
             'size': self.scene.size  # store the size of the pen
         }
-        # self.scene.items().reverse()
-        for item in reversed(self.scene.items()):
+
+        list_size = len(self.scene.items())
+        global g_length
+        reversed_items = self.scene.items()[:g_length:-1]  # Only take stuff that is newly added since the last time
+        g_length = list_size
+        for item_index in range(list_size):
+            item = reversed_items[item_index]
             if isinstance(item, QGraphicsPathItem):
                 line_data = {
                     'color': item.pen().color().name(),
                     'width': item.pen().widthF(),
-                    # 'color': self.my_pen.color().name(),
-                    # 'width': self.my_pen.widthF(),
                     'points': []  # stores the (X,Y) coordinate of the line
                 }
 
@@ -277,8 +282,59 @@ class MainWindow(QMainWindow, Ui_MainWindow):
                     line_data['points'].extend([(point.x(), point.y()) for point in subpath])
 
                 data['lines'].append(line_data)
-        # print(data)
         signal_manager.data_sig.emit(data, self.undo_flag)
+
+    def build_scene_file(self, data):
+        # self.scene.clear()
+        scene_file = data['scene_info']
+
+        undo_flag = data['flag']
+
+        self.scene.drawing = True
+        prev = {'lines': [],  # stores info of each line drawn
+                'scene_rect': [],  # stores dimension of scene
+                'color': "",  # store the color used
+                'size': 20  # store the size of the pen
+                }
+
+        try:
+            if 'scene_info' in data:
+                if 'scene_rect' in scene_file:
+                    scene_rect = scene_file['scene_rect']
+                    self.scene.setSceneRect(0, 0, scene_rect[0], scene_rect[1])
+                else:
+                    # Provide default scene rectangle if 'scene_rect' key is missing
+                    self.scene.setSceneRect(0, 0, 600, 500)  # Adjust the default values as needed
+                self.scene.change_color(QColor(scene_file['color']))
+                self.scene.color.setAlpha(255)
+
+                if 'size' in scene_file.keys():
+                    self.scene.change_size(scene_file['size'])
+                    prev = scene_file
+                else:
+                    pass
+                # Add lines to the scene
+                if 'lines' in scene_file:
+                    for line_data in scene_file['lines']:
+                        path = QPainterPath()
+                        path.moveTo(line_data['points'][0][0], line_data['points'][0][1])
+                        print("line_data is cool")
+
+                        for subpath in line_data['points'][1:]:
+                            path.lineTo(subpath[0], subpath[1])
+                        print("Whatever tf subpath is, it's cool")
+
+
+                        pathItem = QGraphicsPathItem(path)
+                        my_pen = QPen(QColor(line_data['color']), line_data['width'])
+                        my_pen.setCapStyle(Qt.PenCapStyle.RoundCap)
+                        pathItem.setPen(my_pen)
+                        pathItem.setZValue(self.scene.itemsBoundingRect().height() + 1)
+                        self.scene.addItem(pathItem)
+
+        except IndexError as e:
+            print(e)
+            pass
 
     def track_mouse_event(self, e):
         if e is True:
