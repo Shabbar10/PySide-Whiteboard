@@ -59,6 +59,7 @@ class MyClient(QTcpSocket):
                             break
 
                 received_dict = json.loads(decoded_data)
+                print(f"Received_dict is {received_dict}")
                 signal_manager.data_ack.emit(received_dict)
 
         except json.JSONDecodeError as e:

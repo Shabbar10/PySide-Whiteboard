@@ -351,6 +351,7 @@ def init_gui():
     signal_manager.data_sig.connect(client.ping_server)
     signal_manager.function_call.connect(window.track_mouse_event)
     signal_manager.data_updated.connect(window.scene_file)
+    signal_manager.data_ack.connect(window.build_scene_file)
 
     window.show()
 
