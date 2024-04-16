@@ -32,12 +32,12 @@ class MyServer(QTcpServer):
 
         self.client_socket.append(socket)
         for each_socket in self.client_socket:
-            each_socket.readyRead.connect(self.on_connected)
+            each_socket.readyRead.connect(lambda: self.on_connected(each_socket))
 
         socket.disconnected.connect(self.on_disconnected)
 
-    def on_connected(self):
-        sender_socket = self.sender()
+    def on_connected(self, sender):
+        sender_socket = sender
         sender_ip = sender_socket.peerAddress().toString()
 
         data = sender_socket.readAll().data()
