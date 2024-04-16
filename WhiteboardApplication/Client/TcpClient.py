@@ -265,8 +265,10 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         print(f"List size is {list_size}")
         global g_length
         reversed_items = self.scene.items()[::-1]  # Only take stuff that is newly added since the last time
-        # Nothing
-        new_items = reversed_items[0:g_length]
+        if g_length != 0:
+            new_items = reversed_items[g_length:]
+        else:
+            new_items = reversed_items
         print(f"g_length before is {g_length}")
         g_length = list_size
         print(f"g_length after is {g_length}")
@@ -288,7 +290,6 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         signal_manager.data_sig.emit(data, self.undo_flag)
 
     def build_scene_file(self, data):
-        # self.scene.clear()
         scene_file = data['scene_info']
 
         undo_flag = data['flag']
