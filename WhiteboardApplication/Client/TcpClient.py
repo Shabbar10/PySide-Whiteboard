@@ -265,6 +265,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         print(f"List size is {list_size}")
         global g_length
         reversed_items = self.scene.items()[::-1]  # Only take stuff that is newly added since the last time
+        # Nothing
         new_items = reversed_items[0:g_length]
         print(f"g_length before is {g_length}")
         g_length = list_size

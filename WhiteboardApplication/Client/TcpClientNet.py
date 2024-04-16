@@ -25,7 +25,6 @@ class MyClient(QTcpSocket):
     def __init__(self):
         super().__init__()
         self.connected.connect(self.ping_server)
-        print("YES")
         self.data_file = {'scene_file': {},
                           'flag': False}
         print("Signal connected")
@@ -60,7 +59,6 @@ class MyClient(QTcpSocket):
                             break
 
                 received_dict = json.loads(decoded_data)
-                print(f"Received dict:\n{received_dict}\n")
                 signal_manager.data_ack.emit(received_dict)
 
         except json.JSONDecodeError as e:
@@ -74,8 +72,8 @@ class MyClient(QTcpSocket):
 
 
 def start_client(client: MyClient):
-    ip = get_ipv6_address()
-    client.connectToHost(QHostAddress("192.168.152.108"), 8080)
+    # ip = get_ipv6_address()
+    client.connectToHost(QHostAddress("192.168.112.204"), 8080)
     if client.waitForConnected(8080):  # Wait for up to 5 seconds for the connection
         print("Connected to the server")
         # client.readyRead.connect(client.ping_server)
