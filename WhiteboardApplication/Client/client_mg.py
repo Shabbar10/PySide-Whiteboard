@@ -11,6 +11,7 @@ class SignalManager(QObject):
     receive_data = Signal(int, int)
     send_info = Signal(dict)
     send_info2 = Signal(str, str)
+    send_sleep = Signal()
 
     action_signal = Signal(dict)
     data_sig = Signal(dict, bool)

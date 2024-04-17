@@ -42,7 +42,6 @@ class BoardScene(QGraphicsScene):
         self.pathItem = None
         self.drawn_paths = []
         self.my_pen = None
-        self.pos = []
 
     def change_color(self, color):
         self.color = color
@@ -52,7 +51,6 @@ class BoardScene(QGraphicsScene):
 
     def mousePressEvent(self, event):
         if event.button() == Qt.LeftButton:
-            self.pos.clear()
             self.drawing = True
             self.path = QPainterPath()
             self.previous_position = event.scenePos()
@@ -63,33 +61,22 @@ class BoardScene(QGraphicsScene):
             self.pathItem.setPen(self.my_pen)
             self.addItem(self.pathItem)
 
-            self.pos.append(self.previous_position.y())
-            self.pos.append(self.previous_position.x())
             # signal_manager.function_call.emit(True)
 
     def mouseMoveEvent(self, event):
         if self.drawing:
-            self.pos.clear()
-
             curr_position = event.scenePos()
             self.path.lineTo(curr_position)
             self.pathItem.setPath(self.path)
             self.previous_position = curr_position
-            self.pos.append(self.previous_position.y())
-            self.pos.append(self.previous_position.x())
-
-            # signal_manager.function_call.emit(True)
+            signal_manager.function_call.emit(True)
 
     def mouseReleaseEvent(self, event):
         if event.button() == Qt.MouseButton.LeftButton:
-            self.pos.clear()
-            if self.previous_position:
-                self.pos.append(self.previous_position.y())
-                self.pos.append(self.previous_position.x())
             self.previous_position = None
             self.drawing = False
 
-            signal_manager.function_call.emit(True)
+            # signal_manager.function_call.emit(True)
             global g_length
             g_length += 1
 
@@ -99,6 +86,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         super().__init__()
         self.setupUi(self)
         self.undo_flag = False
+        self.data_list = []
         ############################################################################################################
         # Ensure all buttons behave properly when clicked
         self.list_of_buttons = [self.pb_Pen, self.pb_Eraser]
@@ -260,18 +248,18 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             'lines': [],  # stores info of each line drawn
             'scene_rect': [self.scene.width(), self.scene.height()],  # stores dimension of scene
             'color': self.scene.color.name(),  # store the color used
-            'size': self.scene.size  # store the size of the pen
+            'size': self.scene.size,  # store the size of the pen
+            'next_size': 0,
         }
 
-        list_size = len(self.scene.items())
+        self.data_list.append(data)
+
         global g_length
         reversed_items = self.scene.items()[::-1]  # Only take stuff that is newly added since the last time
         if g_length != 0:
             new_items = reversed_items[g_length:]
         else:
             new_items = reversed_items
-        print(f"All items: {self.scene.items()}")
-        print(f"New items: {new_items}")
         for item_index in range(len(new_items)):
             item = new_items[item_index]
             if isinstance(item, QGraphicsPathItem):
@@ -287,7 +275,9 @@ class MainWindow(QMainWindow, Ui_MainWindow):
                     line_data['points'].extend([(point.x(), point.y()) for point in subpath])
 
                 data['lines'].append(line_data)
-        signal_manager.data_sig.emit(data, self.undo_flag)
+        if len(self.data_list) > 1:
+            self.data_list[0]['next_size'] = self.data_list[1].__sizeof__()
+            signal_manager.data_sig.emit(self.data_list.pop(0), self.undo_flag)
 
     def build_scene_file(self, data):
         scene_file = data['scene_info']
@@ -349,13 +339,13 @@ def init_gui():
 
     client = MyClient()
     start_client(client)
+
     signal_manager.data_sig.connect(client.ping_server)
     signal_manager.function_call.connect(window.track_mouse_event)
     signal_manager.data_updated.connect(window.scene_file)
     signal_manager.data_ack.connect(window.build_scene_file)
 
     window.show()
-
     app.exec()
 
 

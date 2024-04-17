@@ -1,7 +1,10 @@
 import json
 import socket
+import msgpack
 
 from PySide6.QtNetwork import QHostAddress, QTcpSocket, QAbstractSocket
+from PySide6.QtCore import QUrl, QThread
+from PySide6.QtWebSockets import QWebSocket
 from client_mg import SignalManager
 
 signal_manager = SignalManager()
@@ -28,49 +31,63 @@ class MyClient(QTcpSocket):
         self.data_file = {'scene_file': {},
                           'flag': False}
         print("Signal connected")
+        self.sending_list = []
+        self.flag = False
 
         self.readyRead.connect(self.read_data)
-
-        self.a = 0
 
     def ping_server(self, scene_info, flag):
         self.data_file = {
             'scene_info': scene_info,
             'flag': flag
         }
-        if self.state() == QAbstractSocket.SocketState.ConnectedState:
-            json_dump = json.dumps(self.data_file)
 
-            decoded = json_dump.encode('utf-8')
+        self.sending_list.append(self.data_file)
 
-            self.write(decoded)
+        if len(self.sending_list) > 1:  # Once list has 2 dictionaries, set flag
+            self.flag = True
+
+        if self.flag:
+            if self.state() == QAbstractSocket.SocketState.ConnectedState:
+                # json_dump = json.dumps(self.data_file)
+
+                # encoded = json_dump.encode('utf-32')
+                encoded = msgpack.packb(self.sending_list.pop(0))
+                # self.list_index = (self.list_index + 1) % 5
+
+                self.write(encoded)
 
     def read_data(self):
         data = self.readAll().data()
 
         try:
-            decoded_data = data.decode('utf-8')
-            if decoded_data[0] == '{':
-                for i in range(len(decoded_data)):
-                    if decoded_data[i] == '}' and (i+1) != len(decoded_data):
-                        if decoded_data[i+1] == '{':
+            decoded_data = data.decode('utf-32')
+            # decoded_data = msgpack.unpackb(data)
+            '''
+            if decoded_data[0][0] == '{':
+                for i in range(len(decoded_data[0])):
+                    if decoded_data[0][i] == '}' and (i+1) != len(decoded_data[0]):
+                        if decoded_data[0][i+1] == '{':
                             end_index = i+1
-                            decoded_data = decoded_data[:end_index]
+                            decoded_data[0] = decoded_data[0][:end_index]
                             break
+            received_dict = json.loads(decoded_data[0])
+            '''
+            # signal_manager.data_ack.emit(decoded_data)
 
-                received_dict = json.loads(decoded_data)
-                signal_manager.data_ack.emit(received_dict)
-
-        except json.JSONDecodeError as e:
-            pass
+        # except json.JSONDecodeError as e:
+        except Exception as e:
+            print(e)
+            '''
             print(f"Error msg: {e.msg}")
             print(f"Input document: {e.doc}")
             print(f"Position in document: {e.pos}")
+            '''
 
 
 def start_client(client: MyClient):
     # ip = get_ipv6_address()
-    client.connectToHost(QHostAddress("192.168.1.11"), 8080)
+    client.connectToHost(QHostAddress("192.168.112.82"), 8080)
     if client.waitForConnected(8080):  # Wait for up to 5 seconds for the connection
         print("Connected to the server")
         # client.readyRead.connect(client.ping_server)
@@ -78,3 +95,16 @@ def start_client(client: MyClient):
 
     else:
         print("Connection failed. Error:", client.errorString())
+
+
+def start_web_client(client: MyWebSocket):
+    # ip = get_ipv6_address()
+    connection_ip = "192.168.1.15"
+    connection_url = "ws://" + connection_ip + ":8080"
+    print(f"The connection url is: {connection_url}")
+    url = QUrl(connection_url)
+    client.open(connection_ip)
+    if client.state() == QAbstractSocket.SocketState.ConnectedState:
+        print("Connection to server established")
+    else:
+        print("Connection failed")
