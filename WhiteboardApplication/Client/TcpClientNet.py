@@ -61,8 +61,9 @@ class MyClient(QTcpSocket):
         data = self.readAll().data()
 
         try:
-            decoded_data = data.decode('utf-32')
-            # decoded_data = msgpack.unpackb(data)
+            # decoded_data = data.decode('utf-32')
+            decoded_data = msgpack.unpackb(data)
+            print(decoded_data)
             '''
             if decoded_data[0][0] == '{':
                 for i in range(len(decoded_data[0])):
@@ -95,16 +96,3 @@ def start_client(client: MyClient):
 
     else:
         print("Connection failed. Error:", client.errorString())
-
-
-def start_web_client(client: MyWebSocket):
-    # ip = get_ipv6_address()
-    connection_ip = "192.168.1.15"
-    connection_url = "ws://" + connection_ip + ":8080"
-    print(f"The connection url is: {connection_url}")
-    url = QUrl(connection_url)
-    client.open(connection_ip)
-    if client.state() == QAbstractSocket.SocketState.ConnectedState:
-        print("Connection to server established")
-    else:
-        print("Connection failed")
