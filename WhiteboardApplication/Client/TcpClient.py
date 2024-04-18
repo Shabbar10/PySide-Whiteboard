@@ -62,7 +62,7 @@ class BoardScene(QGraphicsScene):
             self.pathItem.setPen(self.my_pen)
             self.addItem(self.pathItem)
 
-            # signal_manager.function_call.emit(True)
+            signal_manager.call_dummy.emit()
 
     def mouseMoveEvent(self, event):
         if self.drawing:
@@ -70,6 +70,7 @@ class BoardScene(QGraphicsScene):
             self.path.lineTo(curr_position)
             self.pathItem.setPath(self.path)
             self.previous_position = curr_position
+
             signal_manager.function_call.emit(True)
 
     def mouseReleaseEvent(self, event):
@@ -77,9 +78,19 @@ class BoardScene(QGraphicsScene):
             self.previous_position = None
             self.drawing = False
 
-            # signal_manager.function_call.emit(True)
             global g_length
             g_length += 1
+
+    def dummy(self):
+        data = {
+            'lines': [],  # stores info of each line drawn
+            'scene_rect': [self.width(), self.height()],  # stores dimension of scene
+            'color': self.color.name(),  # store the color used
+            'size': self.size,  # store the size of the pen
+            'next_size': 0,
+        }
+
+        self.data_list.append(data)
 
     def scene_file(self, flag):
         self.undo_flag = flag
@@ -90,8 +101,6 @@ class BoardScene(QGraphicsScene):
             'size': self.size,  # store the size of the pen
             'next_size': 0,
         }
-
-        self.data_list.append(data)
 
         global g_length
         reversed_items = self.items()[::-1]  # Only take stuff that is newly added since the last time
@@ -114,8 +123,10 @@ class BoardScene(QGraphicsScene):
                     line_data['points'].extend([(point.x(), point.y()) for point in subpath])
 
                 data['lines'].append(line_data)
+        self.data_list.append(data)
         if len(self.data_list) > 1:
             self.data_list[0]['next_size'] = self.data_list[1].__sizeof__()
+            print(self.data_list[0]['next_size'])
             signal_manager.data_sig.emit(self.data_list.pop(0), self.undo_flag)
 
     def build_scene_file(self, data):
@@ -331,6 +342,7 @@ def init_gui():
     client = MyClient()
     start_client(client)
 
+    signal_manager.call_dummy.connect(window.scene.dummy)
     signal_manager.data_sig.connect(client.ping_server)
     signal_manager.function_call.connect(window.scene.track_mouse_event)
     signal_manager.data_updated.connect(window.scene.scene_file)

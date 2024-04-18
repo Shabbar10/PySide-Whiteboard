@@ -33,6 +33,7 @@ class MyClient(QTcpSocket):
         print("Signal connected")
         self.sending_list = []
         self.flag = False
+        self.read_flag = False
 
         self.readyRead.connect(self.read_data)
 
@@ -50,7 +51,6 @@ class MyClient(QTcpSocket):
         if self.flag:
             if self.state() == QAbstractSocket.SocketState.ConnectedState:
                 # json_dump = json.dumps(self.data_file)
-
                 # encoded = json_dump.encode('utf-32')
                 encoded = msgpack.packb(self.sending_list.pop(0))
                 # self.list_index = (self.list_index + 1) % 5
@@ -58,12 +58,20 @@ class MyClient(QTcpSocket):
                 self.write(encoded)
 
     def read_data(self):
-        data = self.readAll().data()
-
+        print("Read data called")
+        next_size = 0
         try:
-            # decoded_data = data.decode('utf-32')
-            decoded_data = msgpack.unpackb(data)
-            print(decoded_data)
+            if not self.read_flag:
+                data = self.readAll().data()
+                decoded_data = msgpack.unpackb(data)
+                # print(decoded_data)
+                next_size = decoded_data['next_size']
+                self.read_flag = True
+            else:
+                data = self.read(next_size).data()
+                decoded_data = msgpack.unpackb(data)
+
+            # print(f"Next size is {next_size}")
             '''
             if decoded_data[0][0] == '{':
                 for i in range(len(decoded_data[0])):
@@ -74,16 +82,13 @@ class MyClient(QTcpSocket):
                             break
             received_dict = json.loads(decoded_data[0])
             '''
+            print(f"This is what I've decoded: {decoded_data}")
             # signal_manager.data_ack.emit(decoded_data)
 
         # except json.JSONDecodeError as e:
         except Exception as e:
             print(e)
-            '''
-            print(f"Error msg: {e.msg}")
-            print(f"Input document: {e.doc}")
-            print(f"Position in document: {e.pos}")
-            '''
+            # print(e)
 
 
 def start_client(client: MyClient):
@@ -92,7 +97,6 @@ def start_client(client: MyClient):
     if client.waitForConnected(8080):  # Wait for up to 5 seconds for the connection
         print("Connected to the server")
         # client.readyRead.connect(client.ping_server)
-        print("T+E")
 
     else:
         print("Connection failed. Error:", client.errorString())
