@@ -49,6 +49,7 @@ class MyClient(QTcpSocket):
 
             block = QByteArray()
             stream = QDataStream(block, QIODevice.WriteOnly)
+            print(f"Size: {len(json_dump)}")
             stream.writeUInt32(len(json_dump))
             block.append(json_dump.encode())
 
@@ -89,20 +90,24 @@ class MyClient(QTcpSocket):
 
     def another_read(self):
         stream = QDataStream(self)
+
         if self.bytesAvailable() < 4:  # If no int of size is there
             return
         size = stream.readUInt32()  # read the size
         if self.bytesAvailable() < size:  # if amount of data is not enough
             return
-        data = self.read(size)
-        json_data = json.loads(data.decode())
-        print(f"Received data: {json_data}")
-        # dummy
+        try:
+            data = self.read(size)
+            print(data)
+            json_data = json.loads(data.data().decode())
+            signal_manager.data_ack.emit(json_data)
+        except Exception as e:
+            print(e)
 
 
 def start_client(client: MyClient):
     # ip = get_ipv6_address()
-    client.connectToHost(QHostAddress("192.168.112.82"), 8080)
+    client.connectToHost(QHostAddress("192.168.1.15"), 8080)
     if client.waitForConnected(8080):  # Wait for up to 5 seconds for the connection
         print("Connected to the server")
         # client.readyRead.connect(client.ping_server)

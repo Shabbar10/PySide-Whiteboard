@@ -62,7 +62,7 @@ class BoardScene(QGraphicsScene):
             self.pathItem.setPen(self.my_pen)
             self.addItem(self.pathItem)
 
-            signal_manager.call_dummy.emit()
+            # signal_manager.call_dummy.emit()
 
     def mouseMoveEvent(self, event):
         if self.drawing:
@@ -122,7 +122,7 @@ class BoardScene(QGraphicsScene):
                     line_data['points'].extend([(point.x(), point.y()) for point in subpath])
 
                 data['lines'].append(line_data)
-        signal_manager.data_sig.emit(self.data_list.pop(0), self.undo_flag)
+        signal_manager.data_sig.emit(data, self.undo_flag)
 
     def build_scene_file(self, data):
         scene_file = data['scene_info']
