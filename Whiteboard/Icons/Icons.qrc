@@ -1,0 +1,14 @@
+<RCC>
+  <qresource prefix="Tools">
+    <file>line.png</file>
+    <file>undo.png</file>
+    <file>redo.png</file>
+    <file>ellipse.png</file>
+    <file>rect.png</file>
+    <file>rounded_rect.png</file>
+    <file>triangle.png</file>
+    <file>eraser.png</file>
+    <file>brush.png</file>
+    <file>pen.png</file>
+  </qresource>
+</RCC>
