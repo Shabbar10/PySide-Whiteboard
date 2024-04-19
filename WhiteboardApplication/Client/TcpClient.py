@@ -1,3 +1,5 @@
+import sys
+
 from PySide6.QtWidgets import (
     QMainWindow,
     QGraphicsScene,
@@ -105,7 +107,7 @@ class BoardScene(QGraphicsScene):
         global g_length
         reversed_items = self.items()[::-1]  # Only take stuff that is newly added since the last time
         if g_length != 0:
-            new_items = reversed_items[g_length:]
+            new_items = reversed_items[:g_length]
         else:
             new_items = reversed_items
         for item_index in range(len(new_items)):
@@ -126,7 +128,10 @@ class BoardScene(QGraphicsScene):
         self.data_list.append(data)
         if len(self.data_list) > 1:
             self.data_list[0]['next_size'] = self.data_list[1].__sizeof__()
-            print(self.data_list[0]['next_size'])
+            # print("Size : ", self.data_list[0]['next_size'])
+            # print("Line Data : ", line_data.__sizeof__())
+            print("Data size : ", sys.getsizeof(data))
+            # print("Data : ", data.__sizeof__())
             signal_manager.data_sig.emit(self.data_list.pop(0), self.undo_flag)
 
     def build_scene_file(self, data):
