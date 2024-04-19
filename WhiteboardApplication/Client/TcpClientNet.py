@@ -51,7 +51,7 @@ class MyClient(QTcpSocket):
             stream = QDataStream(block, QIODevice.WriteOnly)
             print(f"Size: {len(json_dump)}")
             stream.writeUInt32(len(json_dump))
-            block.append(json_dump.encode())
+            block.append(json_dump.encode('utf-8'))
 
             self.write(block)
 
@@ -99,7 +99,7 @@ class MyClient(QTcpSocket):
         try:
             data = self.read(size)
             print(data)
-            json_data = json.loads(data.data().decode())
+            json_data = json.loads(data.data().decode('utf-8'))
             signal_manager.data_ack.emit(json_data)
         except Exception as e:
             print(e)
