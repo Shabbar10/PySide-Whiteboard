@@ -58,17 +58,32 @@ class MyClient(QTcpSocket):
 
     def read_data(self):
         data = self.readAll().data()
+        extra_data = ''
 
         try:
             decoded_data = data.decode('utf-32')
             # decoded_data = msgpack.unpackb(data)
             if decoded_data[0] == '{':
+                if decoded_data[len(decoded_data) - 1] == '}':
+                    received_dict = json.loads(decoded_data)
+                    print("Successfully loaded")
+                    signal_manager.data_ack.emit(received_dict)
+                else:
+                    for i in range(len(decoded_data)):
+                        if decoded_data[i] == '}' and (i+1) != len(decoded_data):
+                            # print(f"Checking:\n{decoded_data[i]}\n{decoded_data[i+2]}")
+                            if decoded_data[i+2] == '{':
+                                end_index = i+2
+                                decoded_data = decoded_data[:end_index - 1]
+                                extra_data = decoded_data[end_index:]
+            else:
                 for i in range(len(decoded_data)):
                     if decoded_data[i] == '}' and (i+1) != len(decoded_data):
-                        if decoded_data[i+1] == '{':
-                            end_index = i+1
-                            decoded_data = decoded_data[:end_index]
-                            break
+                        if decoded_data[i+2] == '{':
+                            end_index = i+2
+                            extra_2 = decoded_data[:end_index - 1]
+                            decoded_data = extra_data + extra_2
+
             received_dict = json.loads(decoded_data)
             signal_manager.data_ack.emit(received_dict)
 
