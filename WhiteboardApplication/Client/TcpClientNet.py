@@ -95,16 +95,16 @@ class MyClient(QTcpSocket):
             return
         size = stream.readUInt32()  # read the size
         print(f"Size: {size}")
-        while True:
-            if self.bytesAvailable() < size:  # if amount of data is not enough
-                continue
-            else:
-                break
         try:
-            data = self.read(size)
-            print(data)
-            json_data = json.loads(data.data().decode('utf-8'))
-            signal_manager.data_ack.emit(json_data)
+            while True:
+                if self.bytesAvailable() < size:  # if amount of data is not enough
+                    continue
+                else:
+                    data = self.read(size)
+                    print(data)
+                    json_data = json.loads(data.data().decode('utf-8'))
+                    signal_manager.data_ack.emit(json_data)
+                    break
         except Exception as e:
             print(e)
 
