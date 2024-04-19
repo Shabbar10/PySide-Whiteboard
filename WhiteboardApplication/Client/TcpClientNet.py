@@ -84,7 +84,7 @@ class MyClient(QTcpSocket):
 
 def start_client(client: MyClient):
     # ip = get_ipv6_address()
-    client.connectToHost(QHostAddress("192.168.201.204"), 8080)
+    client.connectToHost(QHostAddress("192.168.112.204"), 8080)
     if client.waitForConnected(8080):  # Wait for up to 5 seconds for the connection
         print("Connected to the server")
         # client.readyRead.connect(client.ping_server)
