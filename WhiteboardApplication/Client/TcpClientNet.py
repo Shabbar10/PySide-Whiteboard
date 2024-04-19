@@ -97,6 +97,7 @@ class MyClient(QTcpSocket):
         data = self.read(size)
         json_data = json.loads(data.decode())
         print(f"Received data: {json_data}")
+        # dummy
 
 
 def start_client(client: MyClient):
