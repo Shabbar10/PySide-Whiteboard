@@ -94,8 +94,12 @@ class MyClient(QTcpSocket):
         if self.bytesAvailable() < 4:  # If no int of size is there
             return
         size = stream.readUInt32()  # read the size
-        if self.bytesAvailable() < size:  # if amount of data is not enough
-            return
+        print(f"Size: {size}")
+        while True:
+            if self.bytesAvailable() < size:  # if amount of data is not enough
+                continue
+            else:
+                break
         try:
             data = self.read(size)
             print(data)

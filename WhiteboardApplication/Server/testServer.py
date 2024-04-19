@@ -40,15 +40,7 @@ class MyServer(QTcpServer):
         sender_socket = self.sender()
         sender_ip = sender_socket.peerAddress().toString()
 
-        stream = QDataStream(sender_socket)
-
-        if sender_socket.bytesAvailable() < 4:
-            return
-        size = stream.readUInt32()
-        print(f"Size: {size}")
-        if sender_socket.bytesAvailable() < size:
-            return
-        data = sender_socket.read(size)
+        data = sender_socket.readAll()
 
         for each_socket in self.client_socket:
             if each_socket.peerAddress().toString() != sender_ip:
