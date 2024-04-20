@@ -3,8 +3,7 @@ import socket
 import msgpack
 
 from PySide6.QtNetwork import QHostAddress, QTcpSocket, QAbstractSocket
-from PySide6.QtCore import QUrl, QThread
-from PySide6.QtWebSockets import QWebSocket
+from PySide6.QtCore import QByteArray, QDataStream, QIODevice
 from client_mg import SignalManager
 
 signal_manager = SignalManager()
@@ -35,35 +34,33 @@ class MyClient(QTcpSocket):
         self.flag = False
         self.read_flag = False
 
-        self.readyRead.connect(self.read_data)
+        # self.readyRead.connect(self.read_data)
+        self.readyRead.connect(self.another_read)
 
-    def ping_server(self, scene_info, flag):
+    def ping_server(self, scene_info: dict, flag):
+        # print(f"Scene_info size: {scene_info.__sizeof__()}")
         self.data_file = {
             'scene_info': scene_info,
             'flag': flag
         }
 
-        self.sending_list.append(self.data_file)
+        if self.state() == QAbstractSocket.SocketState.ConnectedState:
+            json_dump = json.dumps(self.data_file)
 
-        if len(self.sending_list) > 1:  # Once list has 2 dictionaries, set flag
-            self.flag = True
+            block = QByteArray()
+            stream = QDataStream(block, QIODevice.WriteOnly)
+            print(f"Size: {len(json_dump)}")
+            stream.writeUInt32(len(json_dump))
+            block.append(json_dump.encode('utf-8'))
 
-        if self.flag:
-            if self.state() == QAbstractSocket.SocketState.ConnectedState:
-                # json_dump = json.dumps(self.data_file)
-                # encoded = json_dump.encode('utf-32')
-                encoded = msgpack.packb(self.sending_list.pop(0))
-                print("Encoded length : ", len(encoded))
-                # self.list_index = (self.list_index + 1) % 5
-
-                self.write(encoded)
+            self.write(block)
 
     def read_data(self):
+        print("Read data called")
         next_size = 0
         try:
             if not self.read_flag:
                 data = self.readAll().data()
-                print(f"The received size is {data.__sizeof__()}")
                 decoded_data = msgpack.unpackb(data)
                 # print(decoded_data)
                 next_size = decoded_data['next_size']
@@ -84,17 +81,37 @@ class MyClient(QTcpSocket):
             received_dict = json.loads(decoded_data[0])
             '''
             print(f"This is what I've decoded: {decoded_data}")
-            signal_manager.data_ack.emit(decoded_data)
+            # signal_manager.data_ack.emit(decoded_data)
 
         # except json.JSONDecodeError as e:
         except Exception as e:
             print(e)
             # print(e)
 
+    def another_read(self):
+        stream = QDataStream(self)
+
+        if self.bytesAvailable() < 4:  # If no int of size is there
+            return
+        size = stream.readUInt32()  # read the size
+        print(f"Size: {size}")
+        try:
+            while True:
+                if self.bytesAvailable() < size:  # if amount of data is not enough
+                    continue
+                else:
+                    data = self.read(size)
+                    print(data)
+                    json_data = json.loads(data.data().decode('utf-8'))
+                    signal_manager.data_ack.emit(json_data)
+                    break
+        except Exception as e:
+            print(e)
+
 
 def start_client(client: MyClient):
     # ip = get_ipv6_address()
-    client.connectToHost(QHostAddress("192.168.201.204"), 8080)
+    client.connectToHost(QHostAddress("192.168.1.15"), 8080)
     if client.waitForConnected(8080):  # Wait for up to 5 seconds for the connection
         print("Connected to the server")
         # client.readyRead.connect(client.ping_server)

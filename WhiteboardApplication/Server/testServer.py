@@ -2,7 +2,7 @@ import redis
 from PySide6.QtNetwork import QTcpServer, QTcpSocket, QHostAddress
 from getip import get_local_ip
 from netManage import SignalManager
-from PySide6.QtCore import QCoreApplication, Signal
+from PySide6.QtCore import QCoreApplication, Signal, QDataStream
 
 signal_manager = SignalManager()
 
@@ -40,7 +40,7 @@ class MyServer(QTcpServer):
         sender_socket = self.sender()
         sender_ip = sender_socket.peerAddress().toString()
 
-        data = sender_socket.readAll().data()
+        data = sender_socket.readAll()
 
         for each_socket in self.client_socket:
             if each_socket.peerAddress().toString() != sender_ip:

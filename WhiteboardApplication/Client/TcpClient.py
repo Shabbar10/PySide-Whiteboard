@@ -1,5 +1,3 @@
-import sys
-
 from PySide6.QtWidgets import (
     QMainWindow,
     QGraphicsScene,
@@ -64,7 +62,7 @@ class BoardScene(QGraphicsScene):
             self.pathItem.setPen(self.my_pen)
             self.addItem(self.pathItem)
 
-            signal_manager.call_dummy.emit()
+            # signal_manager.call_dummy.emit()
 
     def mouseMoveEvent(self, event):
         if self.drawing:
@@ -101,13 +99,12 @@ class BoardScene(QGraphicsScene):
             'scene_rect': [self.width(), self.height()],  # stores dimension of scene
             'color': self.color.name(),  # store the color used
             'size': self.size,  # store the size of the pen
-            'next_size': 0,
         }
 
         global g_length
         reversed_items = self.items()[::-1]  # Only take stuff that is newly added since the last time
         if g_length != 0:
-            new_items = reversed_items[:g_length]
+            new_items = reversed_items[g_length:]
         else:
             new_items = reversed_items
         for item_index in range(len(new_items)):
@@ -125,14 +122,7 @@ class BoardScene(QGraphicsScene):
                     line_data['points'].extend([(point.x(), point.y()) for point in subpath])
 
                 data['lines'].append(line_data)
-        self.data_list.append(data)
-        if len(self.data_list) > 1:
-            self.data_list[0]['next_size'] = self.data_list[1].__sizeof__()
-            # print("Size : ", self.data_list[0]['next_size'])
-            # print("Line Data : ", line_data.__sizeof__())
-            print("Data size : ", sys.getsizeof(data))
-            # print("Data : ", data.__sizeof__())
-            signal_manager.data_sig.emit(self.data_list.pop(0), self.undo_flag)
+        signal_manager.data_sig.emit(data, self.undo_flag)
 
     def build_scene_file(self, data):
         scene_file = data['scene_info']
