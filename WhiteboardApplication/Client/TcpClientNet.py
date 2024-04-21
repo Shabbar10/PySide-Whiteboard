@@ -10,7 +10,6 @@ import threading
 
 signal_manager = SignalManager()
 
-
 def get_ipv6_address():
     s = socket.socket(socket.AF_INET6, socket.SOCK_DGRAM)
 
@@ -41,8 +40,10 @@ class MyClient(QTcpSocket):
         # self.readyRead.connect(self.read_data)
         self.readyRead.connect(self.another_read)
 
-    def ping_server(self, scene_info: dict, flag):
-        # print(f"Scene_info size: {scene_info.__sizeof__()}")
+
+
+
+    def ping_server(self, scene_info, flag):
         self.data_file = {
             'scene_info': scene_info,
             'flag': flag
@@ -70,6 +71,8 @@ class MyClient(QTcpSocket):
             # self.flush()
             block.clear()
             # print(f"{len(json_dump)} : {self.data_file}")
+
+
 
     def read_data(self):
         next_size = 0
@@ -154,6 +157,8 @@ def start_client(client: MyClient):
     # client.connectToHost(QHostAddress("192.168.201.204"), 8080)
     client.connectToHost(QHostAddress("192.168.1.14"), 8080)
 
+    # ip = get_ipv6_address()
+    # client.connectToHost(QHostAddress("192.168.1.14"), 8080)
     if client.waitForConnected(8080):  # Wait for up to 5 seconds for the connection
         print("Connected to the server")
         # client.readyRead.connect(client.ping_server)
