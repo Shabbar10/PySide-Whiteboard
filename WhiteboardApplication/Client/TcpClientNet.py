@@ -3,6 +3,7 @@ import socket
 import msgpack
 
 from PySide6.QtNetwork import QHostAddress, QTcpSocket, QAbstractSocket
+
 from PySide6.QtCore import QByteArray, QDataStream, QIODevice
 from client_mg import SignalManager
 import threading
@@ -152,6 +153,7 @@ def start_client(client: MyClient):
     # ip = get_ipv6_address()
     # client.connectToHost(QHostAddress("192.168.201.204"), 8080)
     client.connectToHost(QHostAddress("192.168.1.14"), 8080)
+
     if client.waitForConnected(8080):  # Wait for up to 5 seconds for the connection
         print("Connected to the server")
         # client.readyRead.connect(client.ping_server)
