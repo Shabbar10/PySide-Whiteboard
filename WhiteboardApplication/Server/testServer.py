@@ -16,7 +16,7 @@ class MyServer(QTcpServer):
         self.client_socket = []
         self.database_signal = Signal(str, str)
         redis_host = 'localhost'
-        redis_port = 5001
+        redis_port = 6379
 
         self.r = redis.StrictRedis(redis_host, redis_port, decode_responses=True)
 
@@ -42,6 +42,7 @@ class MyServer(QTcpServer):
 
         data = sender_socket.readAll()
 
+        # print(f"{sender_ip}, Size={len(data)} : {data}")
         for each_socket in self.client_socket:
             if each_socket.peerAddress().toString() != sender_ip:
                 each_socket.write(data)

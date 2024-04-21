@@ -5,6 +5,7 @@ import msgpack
 from PySide6.QtNetwork import QHostAddress, QTcpSocket, QAbstractSocket
 from PySide6.QtCore import QByteArray, QDataStream, QIODevice
 from client_mg import SignalManager
+import threading
 
 signal_manager = SignalManager()
 
@@ -34,6 +35,8 @@ class MyClient(QTcpSocket):
         self.flag = False
         self.read_flag = False
 
+
+
         # self.readyRead.connect(self.read_data)
         self.readyRead.connect(self.another_read)
 
@@ -53,16 +56,17 @@ class MyClient(QTcpSocket):
             stream.writeUInt32(len(json_dump))
             block.append(json_dump.encode('utf-8'))
 
-        if self.flag:
-            if self.state() == QAbstractSocket.SocketState.ConnectedState:
-                # json_dump = json.dumps(self.data_file)
-                # encoded = json_dump.encode('utf-32')
-                encoded = msgpack.packb(self.sending_list.pop(0))
-                print("Encoded length : ", len(encoded))
-                # self.list_index = (self.list_index + 1) % 5
-
-                self.write(encoded)
+            # if self.flag:
+            #     if self.state() == QAbstractSocket.SocketState.ConnectedState:
+            #         # json_dump = json.dumps(self.data_file)
+            #         # encoded = json_dump.encode('utf-32')
+            #         encoded = msgpack.packb(self.sending_list.pop(0))
+            #         print("Encoded length : ", len(encoded))
+            #         # self.list_index = (self.list_index + 1) % 5
+            #
+            #         self.write(encoded)
             self.write(block)
+            # print(f"{len(json_dump)} : {self.data_file}")
 
     def read_data(self):
         next_size = 0
@@ -99,29 +103,46 @@ class MyClient(QTcpSocket):
 
     def another_read(self):
         stream = QDataStream(self)
-
-        if self.bytesAvailable() < 4:  # If no int of size is there
-            return
-        size = stream.readUInt32()  # read the size
-        print(f"Size: {size}")
         try:
-            while True:
-                if self.bytesAvailable() < size:  # if amount of data is not enough
-                    continue
-                else:
-                    data = self.read(size)
-                    print(data)
-                    json_data = json.loads(data.data().decode('utf-8'))
-                    signal_manager.data_ack.emit(json_data)
-                    break
+            while self.bytesAvailable() >= 4:
+                size = stream.readUInt32()  # Read the size
+                print(f"Size: {size}")
+                data = self.read(size)  # Read the data
+
+                json_data = json.loads(data.data().decode('utf-8'))
+                signal_manager.data_ack.emit(json_data)
+
         except Exception as e:
-            print(e)
+            print("Error decoding JSON:", e)
+        else:
+            signal_manager.data_ack.emit(json_data)
+            # Handle the decoding error, such as logging or ignoring the data
+        # while self.bytesAvailable() > 0:
+        #     if self.bytesAvailable() < 4:  # If no int of size is there
+        #         # return
+        #         print("Size less than 4 bytes")
+        #         break
+        #
+        #     size = stream.readUInt32()  # read the size
+        #     print(f"Size: {size}")
+        #     try:
+        #         while True:
+        #             if self.bytesAvailable() < size:  # if amount of data is not enough
+        #                 continue
+        #             else:
+        #                 data = self.read(size)
+        #                 # print(data)
+        #                 json_data = json.loads(data.data().decode('utf-8'))
+        #                 signal_manager.data_ack.emit(json_data)
+        #                 break
+        #     except Exception as e:
+        #         print(e)
 
 
 def start_client(client: MyClient):
     # ip = get_ipv6_address()
-    client.connectToHost(QHostAddress("192.168.201.204"), 8080)
-    client.connectToHost(QHostAddress("192.168.1.15"), 8080)
+    # client.connectToHost(QHostAddress("192.168.201.204"), 8080)
+    client.connectToHost(QHostAddress("192.168.1.6"), 8080)
     if client.waitForConnected(8080):  # Wait for up to 5 seconds for the connection
         print("Connected to the server")
         # client.readyRead.connect(client.ping_server)
