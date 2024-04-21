@@ -6,7 +6,6 @@ from client_mg import SignalManager
 
 signal_manager = SignalManager()
 
-
 def get_ipv6_address():
     s = socket.socket(socket.AF_INET6, socket.SOCK_DGRAM)
 
@@ -34,6 +33,8 @@ class MyClient(QTcpSocket):
 
         self.a = 0
 
+
+
     def ping_server(self, scene_info, flag):
         self.data_file = {
             'scene_info': scene_info,
@@ -45,6 +46,8 @@ class MyClient(QTcpSocket):
             decoded = json_dump.encode('utf-8')
 
             self.write(decoded)
+
+
 
     def read_data(self):
         data = self.readAll().data()
@@ -75,7 +78,7 @@ class MyClient(QTcpSocket):
 
 def start_client(client: MyClient):
     ip = get_ipv6_address()
-    client.connectToHost(QHostAddress("192.168.152.108"), 8080)
+    client.connectToHost(QHostAddress("192.168.1.14"), 8080)
     if client.waitForConnected(8080):  # Wait for up to 5 seconds for the connection
         print("Connected to the server")
         # client.readyRead.connect(client.ping_server)

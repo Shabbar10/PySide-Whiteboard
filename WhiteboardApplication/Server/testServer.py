@@ -20,9 +20,12 @@ class MyServer(QTcpServer):
 
         self.r = redis.StrictRedis(redis_host, redis_port, decode_responses=True)
         # Set data in Redis
-        swlfr.set('Atharva', 'ghanekar')
-        r.set('Abubakar', 'siddiq')
-        r.set('Shabbar', 'adamjee')
+        self.r.set('Atharva', 'ghanekar')
+        self.r.set('Abubakar', 'siddiq')
+        self.r.set('Shabbar', 'adamjee')
+        self.r.set('Hussain', 'ceyloni')
+
+
 
     def incomingConnection(self, socket_descriptor):
         socket = QTcpSocket()
@@ -39,6 +42,7 @@ class MyServer(QTcpServer):
             each_socket.readyRead.connect(lambda: self.on_connected(each_socket))
 
         socket.disconnected.connect(self.on_disconnected)
+
 
     def on_connected(self, sender):
         sender_socket = sender

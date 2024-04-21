@@ -15,6 +15,7 @@ class SignalManager(QObject):
     action_signal = Signal(dict)
     data_sig = Signal(dict, bool)
     data_ack = Signal(dict)
+    login_verify = Signal(bool)
 
     def update_data(self, data):
         self.data_updated.emit(data)
