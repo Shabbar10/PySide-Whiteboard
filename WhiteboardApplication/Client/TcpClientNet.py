@@ -66,6 +66,8 @@ class MyClient(QTcpSocket):
             #
             #         self.write(encoded)
             self.write(block)
+            # self.flush()
+            block.clear()
             # print(f"{len(json_dump)} : {self.data_file}")
 
     def read_data(self):
@@ -102,20 +104,27 @@ class MyClient(QTcpSocket):
             # print(e)
 
     def another_read(self):
+        read_flag = True
         stream = QDataStream(self)
         try:
             while self.bytesAvailable() >= 4:
+                # size = 0
+            # if read_flag:
                 size = stream.readUInt32()  # Read the size
                 print(f"Size: {size}")
+                # read_flag = False
+            # if self.bytesAvailable() >= size:
                 data = self.read(size)  # Read the data
+                # read_flag = True
 
                 json_data = json.loads(data.data().decode('utf-8'))
-                signal_manager.data_ack.emit(json_data)
+                # signal_manager.data_ack.emit(json_data)
 
         except Exception as e:
             print("Error decoding JSON:", e)
         else:
             signal_manager.data_ack.emit(json_data)
+            # self.flush()
             # Handle the decoding error, such as logging or ignoring the data
         # while self.bytesAvailable() > 0:
         #     if self.bytesAvailable() < 4:  # If no int of size is there
@@ -142,7 +151,7 @@ class MyClient(QTcpSocket):
 def start_client(client: MyClient):
     # ip = get_ipv6_address()
     # client.connectToHost(QHostAddress("192.168.201.204"), 8080)
-    client.connectToHost(QHostAddress("192.168.1.6"), 8080)
+    client.connectToHost(QHostAddress("192.168.1.14"), 8080)
     if client.waitForConnected(8080):  # Wait for up to 5 seconds for the connection
         print("Connected to the server")
         # client.readyRead.connect(client.ping_server)

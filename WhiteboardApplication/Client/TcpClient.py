@@ -50,13 +50,13 @@ class BoardScene(QGraphicsScene):
         self.drawn_paths = []
         self.my_pen = None
         self.recv_timer = QTimer()
-        self.recv_timer.setInterval(1)
+        self.recv_timer.setInterval(100)
         self.recv_timer.timeout.connect(self.build_scene_file)
         self.recv_timer.start()
 
 
         self.send_timer = QTimer()
-        self.send_timer.setInterval(1)
+        self.send_timer.setInterval(100)
         self.recv_timer.timeout.connect(self.sender_control)
         self.send_timer.start()
 
