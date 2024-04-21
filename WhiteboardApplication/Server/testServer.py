@@ -19,6 +19,10 @@ class MyServer(QTcpServer):
         redis_port = 5001
 
         self.r = redis.StrictRedis(redis_host, redis_port, decode_responses=True)
+        # Set data in Redis
+        swlfr.set('Atharva', 'ghanekar')
+        r.set('Abubakar', 'siddiq')
+        r.set('Shabbar', 'adamjee')
 
     def incomingConnection(self, socket_descriptor):
         socket = QTcpSocket()
