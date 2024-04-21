@@ -74,6 +74,9 @@
        <iconset resource="../../Icons/Icons.qrc">
         <normaloff>:/Tools/rect.png</normaloff>:/Tools/rect.png</iconset>
       </property>
+      <property name="checkable">
+       <bool>true</bool>
+      </property>
      </widget>
     </item>
     <item row="0" column="0">
@@ -148,6 +151,9 @@
        <iconset resource="../../Icons/Icons.qrc">
         <normaloff>:/Tools/line.png</normaloff>:/Tools/line.png</iconset>
       </property>
+      <property name="checkable">
+       <bool>true</bool>
+      </property>
      </widget>
     </item>
     <item row="5" column="0">
@@ -171,6 +177,9 @@
       <property name="icon">
        <iconset resource="../../Icons/Icons.qrc">
         <normaloff>:/Tools/ellipse.png</normaloff>:/Tools/ellipse.png</iconset>
+      </property>
+      <property name="checkable">
+       <bool>true</bool>
       </property>
      </widget>
     </item>
