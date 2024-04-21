@@ -3,8 +3,10 @@ import socket
 import msgpack
 
 from PySide6.QtNetwork import QHostAddress, QTcpSocket, QAbstractSocket
-from PySide6.QtCore import QUrl, QThread
+
+from PySide6.QtCore import QByteArray, QDataStream, QIODevice
 from client_mg import SignalManager
+import threading
 
 signal_manager = SignalManager()
 
@@ -32,78 +34,129 @@ class MyClient(QTcpSocket):
         print("Signal connected")
         self.sending_list = []
         self.flag = False
+        self.read_flag = False
 
-        self.readyRead.connect(self.read_data)
 
-    def ping_server(self, scene_info, flag):
+
+        # self.readyRead.connect(self.read_data)
+        self.readyRead.connect(self.another_read)
+
+    def ping_server(self, scene_info: dict, flag):
+        # print(f"Scene_info size: {scene_info.__sizeof__()}")
         self.data_file = {
             'scene_info': scene_info,
             'flag': flag
         }
 
-        self.sending_list.append(self.data_file)
+        if self.state() == QAbstractSocket.SocketState.ConnectedState:
+            json_dump = json.dumps(self.data_file)
 
-        if len(self.sending_list) > 1:  # Once list has 2 dictionaries, set flag
-            self.flag = True
+            block = QByteArray()
+            stream = QDataStream(block, QIODevice.WriteOnly)
+            print(f"Size: {len(json_dump)}")
+            stream.writeUInt32(len(json_dump))
+            block.append(json_dump.encode('utf-8'))
 
-        if self.flag:
-            if self.state() == QAbstractSocket.SocketState.ConnectedState:
-                json_dump = json.dumps(self.data_file)
-                encoded = json_dump.encode('utf-32')
-
-                # encoded = msgpack.packb(self.sending_list.pop(0))
-                # self.list_index = (self.list_index + 1) % 5
-
-                self.write(encoded)
+            # if self.flag:
+            #     if self.state() == QAbstractSocket.SocketState.ConnectedState:
+            #         # json_dump = json.dumps(self.data_file)
+            #         # encoded = json_dump.encode('utf-32')
+            #         encoded = msgpack.packb(self.sending_list.pop(0))
+            #         print("Encoded length : ", len(encoded))
+            #         # self.list_index = (self.list_index + 1) % 5
+            #
+            #         self.write(encoded)
+            self.write(block)
+            # self.flush()
+            block.clear()
+            # print(f"{len(json_dump)} : {self.data_file}")
 
     def read_data(self):
-        data = self.readAll().data()
-        extra_data = ''
-
+        next_size = 0
         try:
-            decoded_data = data.decode('utf-32')
-            # decoded_data = msgpack.unpackb(data)
-            if decoded_data[0] == '{':
-                if decoded_data[len(decoded_data) - 1] == '}':
-                    received_dict = json.loads(decoded_data)
-                    print("Successfully loaded")
-                    signal_manager.data_ack.emit(received_dict)
-                else:
-                    for i in range(len(decoded_data)):
-                        if decoded_data[i] == '}' and (i+1) != len(decoded_data):
-                            # print(f"Checking:\n{decoded_data[i]}\n{decoded_data[i+2]}")
-                            if decoded_data[i+2] == '{':
-                                end_index = i+2
-                                decoded_data = decoded_data[:end_index - 1]
-                                extra_data = decoded_data[end_index:]
+            if not self.read_flag:
+                data = self.readAll().data()
+                print(f"The received size is {data.__sizeof__()}")
+                decoded_data = msgpack.unpackb(data)
+                # print(decoded_data)
+                next_size = decoded_data['next_size']
+                self.read_flag = True
             else:
-                for i in range(len(decoded_data)):
-                    if decoded_data[i] == '}' and (i+1) != len(decoded_data):
-                        if decoded_data[i+2] == '{':
-                            end_index = i+2
-                            extra_2 = decoded_data[:end_index - 1]
-                            decoded_data = extra_data + extra_2
+                data = self.read(next_size).data()
+                decoded_data = msgpack.unpackb(data)
 
-            received_dict = json.loads(decoded_data)
-            signal_manager.data_ack.emit(received_dict)
+            # print(f"Next size is {next_size}")
+            '''
+            if decoded_data[0][0] == '{':
+                for i in range(len(decoded_data[0])):
+                    if decoded_data[0][i] == '}' and (i+1) != len(decoded_data[0]):
+                        if decoded_data[0][i+1] == '{':
+                            end_index = i+1
+                            decoded_data[0] = decoded_data[0][:end_index]
+                            break
+            received_dict = json.loads(decoded_data[0])
+            '''
+            print(f"This is what I've decoded: {decoded_data}")
+            signal_manager.data_ack.emit(decoded_data)
 
         # except json.JSONDecodeError as e:
         except Exception as e:
             print(e)
-            '''
-            print(f"Error msg: {e.msg}")
-            print(f"Input document: {e.doc}")
-            print(f"Position in document: {e.pos}")
-            '''
+            # print(e)
+
+    def another_read(self):
+        read_flag = True
+        stream = QDataStream(self)
+        try:
+            while self.bytesAvailable() >= 4:
+                # size = 0
+            # if read_flag:
+                size = stream.readUInt32()  # Read the size
+                print(f"Size: {size}")
+                # read_flag = False
+            # if self.bytesAvailable() >= size:
+                data = self.read(size)  # Read the data
+                # read_flag = True
+
+                json_data = json.loads(data.data().decode('utf-8'))
+                # signal_manager.data_ack.emit(json_data)
+
+        except Exception as e:
+            print("Error decoding JSON:", e)
+        else:
+            signal_manager.data_ack.emit(json_data)
+            # self.flush()
+            # Handle the decoding error, such as logging or ignoring the data
+        # while self.bytesAvailable() > 0:
+        #     if self.bytesAvailable() < 4:  # If no int of size is there
+        #         # return
+        #         print("Size less than 4 bytes")
+        #         break
+        #
+        #     size = stream.readUInt32()  # read the size
+        #     print(f"Size: {size}")
+        #     try:
+        #         while True:
+        #             if self.bytesAvailable() < size:  # if amount of data is not enough
+        #                 continue
+        #             else:
+        #                 data = self.read(size)
+        #                 # print(data)
+        #                 json_data = json.loads(data.data().decode('utf-8'))
+        #                 signal_manager.data_ack.emit(json_data)
+        #                 break
+        #     except Exception as e:
+        #         print(e)
 
 
 def start_client(client: MyClient):
     # ip = get_ipv6_address()
-    client.connectToHost(QHostAddress("192.168.112.204"), 8080)
+    # client.connectToHost(QHostAddress("192.168.201.204"), 8080)
+    client.connectToHost(QHostAddress("192.168.1.14"), 8080)
+
     if client.waitForConnected(8080):  # Wait for up to 5 seconds for the connection
         print("Connected to the server")
         # client.readyRead.connect(client.ping_server)
-        print("T+E")
 
     else:
         print("Connection failed. Error:", client.errorString())

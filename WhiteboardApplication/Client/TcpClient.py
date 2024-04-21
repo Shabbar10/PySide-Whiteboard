@@ -17,13 +17,19 @@ from PySide6.QtGui import (
 
 from PySide6.QtCore import (
     Qt,
+    QTimer,
+    QTime
 )
 import json
+import threading
 from TcpClientNet import start_client, MyClient, signal_manager
 from WhiteboardApplication.UI.board import Ui_MainWindow
+from collections import deque
 
 itemTypes = set()
-
+circular_recv_buffer = deque(maxlen=20)
+circular_send_buffer = deque(maxlen=20)
+buffer_flag = 0
 g_length = 0
 
 
@@ -32,9 +38,10 @@ class BoardScene(QGraphicsScene):
         super().__init__()
         self.setSceneRect(0, 0, 600, 500)
 
+        self.undo_flag = False
+        self.data_list = []
         self.path = None
         self.mp = None
-        # self.mp = None
         self.previous_position = None
         self.drawing = False
         self.color = QColor("#000000")
@@ -42,6 +49,17 @@ class BoardScene(QGraphicsScene):
         self.pathItem = None
         self.drawn_paths = []
         self.my_pen = None
+        self.recv_timer = QTimer()
+        self.recv_timer.setInterval(100)
+        self.recv_timer.timeout.connect(self.build_scene_file)
+        self.recv_timer.start()
+
+
+        self.send_timer = QTimer()
+        self.send_timer.setInterval(100)
+        self.recv_timer.timeout.connect(self.sender_control)
+        self.send_timer.start()
+
 
     def change_color(self, color):
         self.color = color
@@ -60,8 +78,9 @@ class BoardScene(QGraphicsScene):
             self.my_pen.setCapStyle(Qt.PenCapStyle.RoundCap)
             self.pathItem.setPen(self.my_pen)
             self.addItem(self.pathItem)
+            signal_manager.data_updated.emit(False)
 
-            # signal_manager.function_call.emit(True)
+            # signal_manager.call_dummy.emit()
 
     def mouseMoveEvent(self, event):
         if self.drawing:
@@ -69,24 +88,137 @@ class BoardScene(QGraphicsScene):
             self.path.lineTo(curr_position)
             self.pathItem.setPath(self.path)
             self.previous_position = curr_position
-            signal_manager.function_call.emit(True)
 
+            # signal_manager.function_call.emit(True)
+            signal_manager.data_updated.emit(False)
     def mouseReleaseEvent(self, event):
         if event.button() == Qt.MouseButton.LeftButton:
             self.previous_position = None
             self.drawing = False
 
-            # signal_manager.function_call.emit(True)
             global g_length
             g_length += 1
+            signal_manager.data_updated.emit(False)
+
+
+    def dummy(self):
+        data = {
+            'lines': [],  # stores info of each line drawn
+            'scene_rect': [self.width(), self.height()],  # stores dimension of scene
+            'color': self.color.name(),  # store the color used
+            'size': self.size,  # store the size of the pen
+            'next_size': 0,
+        }
+
+        self.data_list.append(data)
+
+    def sender_control(self):
+        global circular_send_buffer
+        if len(circular_send_buffer) > 0:
+            temp = circular_send_buffer.pop()
+            print(f"Size : {len(temp)}, data : {temp}")
+            signal_manager.data_sig.emit(temp, self.undo_flag)
+        else:
+            pass
+
+
+    def scene_file(self, flag):
+        global circular_send_buffer
+        self.undo_flag = flag
+        data = {
+            'lines': [],  # stores info of each line drawn
+            'scene_rect': [self.width(), self.height()],  # stores dimension of scene
+            'color': self.color.name(),  # store the color used
+            'size': self.size,  # store the size of the pen
+        }
+
+        global g_length
+        reversed_items = self.items()[::-1]  # Only take stuff that is newly added since the last time
+        if g_length != 0:
+            new_items = reversed_items[g_length:]
+        else:
+            new_items = reversed_items
+        for item_index in range(len(new_items)):
+            item = new_items[item_index]
+            if isinstance(item, QGraphicsPathItem):
+                line_data = {
+                    'color': item.pen().color().name(),
+                    'width': item.pen().widthF(),
+                    'points': []  # stores the (X,Y) coordinate of the line
+                }
+
+                # Extract points from the path
+                for subpath in item.path().toSubpathPolygons():  # to SubpathPolygons method is used to break down
+                    # the complex line into sub parts and store it
+                    line_data['points'].extend([(point.x(), point.y()) for point in subpath])
+
+                data['lines'].append(line_data)
+            
+        circular_send_buffer.appendleft(data)
+        # signal_manager.data_sig.emit(data, self.undo_flag)
+
+    # def build_scene_file(self, data):
+    def build_scene_file(self):
+        if len(circular_recv_buffer) > 0:
+            data = circular_recv_buffer.pop()
+            scene_file = data['scene_info']
+
+            undo_flag = data['flag']
+
+            self.drawing = True
+            prev = {'lines': [],  # stores info of each line drawn
+                    'scene_rect': [],  # stores dimension of scene
+                    'color': "",  # store the color used
+                    'size': 20  # store the size of the pen
+                    }
+
+            try:
+                if 'scene_info' in data:
+                    if 'scene_rect' in scene_file:
+                        scene_rect = scene_file['scene_rect']
+                        self.setSceneRect(0, 0, scene_rect[0], scene_rect[1])
+                    else:
+                        # Provide default scene rectangle if 'scene_rect' key is missing
+                        self.setSceneRect(0, 0, 600, 500)  # Adjust the default values as needed
+                    self.change_color(QColor(scene_file['color']))
+                    self.color.setAlpha(255)
+
+                    if 'size' in scene_file.keys():
+                        self.change_size(scene_file['size'])
+                        prev = scene_file
+                    else:
+                        pass
+                    # Add lines to the scene
+                    if 'lines' in scene_file:
+                        for line_data in scene_file['lines']:
+                            path = QPainterPath()
+                            path.moveTo(line_data['points'][0][0], line_data['points'][0][1])
+
+                            for subpath in line_data['points'][1:]:
+                                path.lineTo(subpath[0], subpath[1])
+
+                            pathItem = QGraphicsPathItem(path)
+                            my_pen = QPen(QColor(line_data['color']), line_data['width'])
+                            my_pen.setCapStyle(Qt.PenCapStyle.RoundCap)
+                            pathItem.setPen(my_pen)
+                            pathItem.setZValue(self.itemsBoundingRect().height() + 1)
+                            self.addItem(pathItem)
+            except IndexError as e:
+                print(e)
+        else:
+            pass
+
+    def track_mouse_event(self, e):
+        if e is True:
+            self.scene_file(False)
+        else:
+            pass
 
 
 class MainWindow(QMainWindow, Ui_MainWindow):
     def __init__(self):
         super().__init__()
         self.setupUi(self)
-        self.undo_flag = False
-        self.data_list = []
         ############################################################################################################
         # Ensure all buttons behave properly when clicked
         self.list_of_buttons = [self.pb_Pen, self.pb_Eraser]
@@ -235,102 +367,13 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             if btn is not sender_button:
                 btn.setChecked(False)
 
-    def erase_path(self, path):
-        for item in self.scene.items():
-            if isinstance(item, QGraphicsPathItem):
-                if item.path() == path:
-                    self.scene.removeItem(item)
-                    break
 
-    def scene_file(self, flag):
-        self.undo_flag = flag
-        data = {
-            'lines': [],  # stores info of each line drawn
-            'scene_rect': [self.scene.width(), self.scene.height()],  # stores dimension of scene
-            'color': self.scene.color.name(),  # store the color used
-            'size': self.scene.size,  # store the size of the pen
-            'next_size': 0,
-        }
-
-        self.data_list.append(data)
-
-        global g_length
-        reversed_items = self.scene.items()[::-1]  # Only take stuff that is newly added since the last time
-        if g_length != 0:
-            new_items = reversed_items[g_length:]
-        else:
-            new_items = reversed_items
-        for item_index in range(len(new_items)):
-            item = new_items[item_index]
-            if isinstance(item, QGraphicsPathItem):
-                line_data = {
-                    'color': item.pen().color().name(),
-                    'width': item.pen().widthF(),
-                    'points': []  # stores the (X,Y) coordinate of the line
-                }
-
-                # Extract points from the path
-                for subpath in item.path().toSubpathPolygons():  # to SubpathPolygons method is used to break down
-                    # the complex line into sub parts and store it
-                    line_data['points'].extend([(point.x(), point.y()) for point in subpath])
-
-                data['lines'].append(line_data)
-        if len(self.data_list) > 1:
-            self.data_list[0]['next_size'] = self.data_list[1].__sizeof__()
-            signal_manager.data_sig.emit(self.data_list.pop(0), self.undo_flag)
-
-    def build_scene_file(self, data):
-        scene_file = data['scene_info']
-
-        undo_flag = data['flag']
-
-        self.scene.drawing = True
-        prev = {'lines': [],  # stores info of each line drawn
-                'scene_rect': [],  # stores dimension of scene
-                'color': "",  # store the color used
-                'size': 20  # store the size of the pen
-                }
-
-        try:
-            if 'scene_info' in data:
-                if 'scene_rect' in scene_file:
-                    scene_rect = scene_file['scene_rect']
-                    self.scene.setSceneRect(0, 0, scene_rect[0], scene_rect[1])
-                else:
-                    # Provide default scene rectangle if 'scene_rect' key is missing
-                    self.scene.setSceneRect(0, 0, 600, 500)  # Adjust the default values as needed
-                self.scene.change_color(QColor(scene_file['color']))
-                self.scene.color.setAlpha(255)
-
-                if 'size' in scene_file.keys():
-                    self.scene.change_size(scene_file['size'])
-                    prev = scene_file
-                else:
-                    pass
-                # Add lines to the scene
-                if 'lines' in scene_file:
-                    for line_data in scene_file['lines']:
-                        path = QPainterPath()
-                        path.moveTo(line_data['points'][0][0], line_data['points'][0][1])
-
-                        for subpath in line_data['points'][1:]:
-                            path.lineTo(subpath[0], subpath[1])
-
-                        pathItem = QGraphicsPathItem(path)
-                        my_pen = QPen(QColor(line_data['color']), line_data['width'])
-                        my_pen.setCapStyle(Qt.PenCapStyle.RoundCap)
-                        pathItem.setPen(my_pen)
-                        pathItem.setZValue(self.scene.itemsBoundingRect().height() + 1)
-                        self.scene.addItem(pathItem)
-
-        except IndexError as e:
-            print(e)
-
-    def track_mouse_event(self, e):
-        if e is True:
-            self.scene_file(False)
-        else:
-            pass
+def update_data(data_recv: dict):
+    global circular_recv_buffer
+    global buffer_flag
+    circular_recv_buffer.appendleft(data_recv)
+    print(circular_recv_buffer)
+    buffer_flag = 1
 
 
 def init_gui():
@@ -340,11 +383,22 @@ def init_gui():
     client = MyClient()
     start_client(client)
 
-    signal_manager.data_sig.connect(client.ping_server)
-    signal_manager.function_call.connect(window.track_mouse_event)
-    signal_manager.data_updated.connect(window.scene_file)
-    signal_manager.data_ack.connect(window.build_scene_file)
 
+    # Start the ping_server thread
+    # ping_server_thread = threading.Thread(target=run_ping_server, args=(client,))
+    # ping_server_thread.start()
+    #
+    # # Start the build_scene thread
+    # build_scene_thread = threading.Thread(target=run_build_scene, args=(window,))
+    # build_scene_thread.start()
+
+
+    signal_manager.call_dummy.connect(window.scene.dummy)
+    signal_manager.data_sig.connect(client.ping_server)
+    signal_manager.function_call.connect(window.scene.track_mouse_event)
+    signal_manager.data_updated.connect(window.scene.scene_file)
+    # signal_manager.data_ack.connect(window.scene.build_scene_file)
+    signal_manager.data_ack.connect(update_data)
     window.show()
     app.exec()
 
