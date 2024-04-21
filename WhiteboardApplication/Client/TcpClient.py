@@ -10,7 +10,9 @@ from PySide6.QtWidgets import (
     QWidget,
     QVBoxLayout,
     QLineEdit,
-    QPushButton
+    QPushButton,
+    QGraphicsEllipseItem,
+    QGraphicsRectItem
 )
 
 from PySide6.QtGui import (
@@ -19,8 +21,6 @@ from PySide6.QtGui import (
     QPainter,
     QPainterPath,
     QColor,
-    QPicture,
-    QPixmap,
     QPalette,
     QLinearGradient,
     QFont
@@ -29,10 +29,9 @@ from PySide6.QtGui import (
 from PySide6.QtCore import (
     Qt,
     QTimer,
-    QTime
+    QRectF
 )
 import json
-import threading
 from TcpClientNet import start_client, MyClient, signal_manager
 from WhiteboardApplication.UI.board import Ui_MainWindow
 from collections import deque
@@ -67,7 +66,10 @@ class BoardScene(QGraphicsScene):
         self.recv_timer.setInterval(100)
         self.recv_timer.timeout.connect(self.build_scene_file)
         self.recv_timer.start()
-
+        self.current_tool = None
+        self.line_mode = False
+        self.ellipse_mode = False
+        self.rectangle_mode = False
 
         self.send_timer = QTimer()
         self.send_timer.setInterval(100)
@@ -81,34 +83,87 @@ class BoardScene(QGraphicsScene):
     def change_size(self, size):
         self.size = size
 
+    def set_tool(self, tool):
+        self.current_tool = tool
+
+    def set_rectangle_mode(self, mode):
+        self.rectangle_mode = mode
+        self.line_mode = False
+        self.ellipse_mode = False
+
+    def set_line_mode(self, mode):
+        self.line_mode = mode
+        self.ellipse_mode = False
+        self.rectangle_mode = False
+
+    def set_ellipse_mode(self, mode):
+        self.ellipse_mode = mode
+        self.line_mode = False
+        self.rectangle_mode = False
+
     def mousePressEvent(self, event):
         if event.button() == Qt.LeftButton:
-            self.drawing = True
-            self.path = QPainterPath()
-            self.previous_position = event.scenePos()
-            self.path.moveTo(self.previous_position)
-            self.pathItem = QGraphicsPathItem()
-            self.my_pen = QPen(self.color, self.size)
-            self.my_pen.setCapStyle(Qt.PenCapStyle.RoundCap)
-            self.pathItem.setPen(self.my_pen)
-            self.addItem(self.pathItem)
-            signal_manager.data_updated.emit(False)
+            if self.rectangle_mode:
+                self.drawing = True
+                self.start_pos = event.scenePos()
+                self.pathItem = QGraphicsRectItem()
+                self.pathItem.setPen(QPen(self.color, self.size))
+                self.addItem(self.pathItem)
+                print(self.items())
+            elif self.line_mode:
+                self.drawing = True
+                self.start_pos = event.scenePos()
+                self.pathItem = QGraphicsPathItem()
+                self.pathItem.setPen(QPen(self.color, self.size))
+                self.addItem(self.pathItem)
+            elif self.ellipse_mode:
+                self.drawing = True
+                self.start_pos = event.scenePos()
+                self.pathItem = QGraphicsEllipseItem()
+                self.pathItem.setPen(QPen(self.color, self.size))
+                self.addItem(self.pathItem)
+            else:
+                self.drawing = True
+                self.path = QPainterPath()
+                self.previous_position = event.scenePos()
+                self.path.moveTo(self.previous_position)
+                self.pathItem = QGraphicsPathItem()
+                my_pen = QPen(self.color, self.size)
+                my_pen.setCapStyle(Qt.PenCapStyle.RoundCap)
+                self.pathItem.setPen(my_pen)
+                self.addItem(self.pathItem)
 
             # signal_manager.call_dummy.emit()
 
     def mouseMoveEvent(self, event):
         if self.drawing:
-            curr_position = event.scenePos()
-            self.path.lineTo(curr_position)
-            self.pathItem.setPath(self.path)
-            self.previous_position = curr_position
+            if self.rectangle_mode:
+                rect = QRectF(self.start_pos, event.scenePos()).normalized()
+                self.pathItem.setRect(rect)
+            elif self.line_mode:
+                path = QPainterPath()
+                path.moveTo(self.start_pos)
+                path.lineTo(event.scenePos())
+                self.pathItem.setPath(path)
+            elif self.ellipse_mode:
+                rect = QRectF(self.start_pos, event.scenePos()).normalized()
+                self.pathItem.setRect(rect)
+            else:
+                curr_position = event.scenePos()
+                self.path.lineTo(curr_position)
+                self.pathItem.setPath(self.path)
+                self.previous_position = curr_position
 
             # signal_manager.function_call.emit(True)
             signal_manager.data_updated.emit(False)
     def mouseReleaseEvent(self, event):
         if event.button() == Qt.MouseButton.LeftButton:
-            self.previous_position = None
             self.drawing = False
+            if self.line_mode or self.ellipse_mode or self.rectangle_mode:
+                self.pathItem = None
+            else:
+                self.drawn_paths.append(self.path)
+                self.pathItem = None
 
             global g_length
             g_length += 1
@@ -140,7 +195,7 @@ class BoardScene(QGraphicsScene):
         global circular_send_buffer
         self.undo_flag = flag
         data = {
-            'lines': [],  # stores info of each line drawn
+            'items': [],  # stores info of each line drawn
             'scene_rect': [self.width(), self.height()],  # stores dimension of scene
             'color': self.color.name(),  # store the color used
             'size': self.size,  # store the size of the pen
@@ -158,16 +213,32 @@ class BoardScene(QGraphicsScene):
                 line_data = {
                     'color': item.pen().color().name(),
                     'width': item.pen().widthF(),
-                    'points': []  # stores the (X,Y) coordinate of the line
+                    'points': [(point.x(), point.y()) for subpath in item.path().toSubpathPolygons() for point in
+                                   subpath]  # stores the (X,Y) coordinate of the line
                 }
+                data['items'].append(line_data)
+            elif isinstance(item, QGraphicsRectItem):
+                rect_data = {
+                    'type': 'rectangle',
+                    'color': item.pen().color().name(),
+                    'width': item.pen().widthF(),
+                    'rect': [item.rect().x(), item.rect().y(), item.rect().width(), item.rect().height()]
+                }
+                data['items'].append(rect_data)
+            elif isinstance(item, QGraphicsEllipseItem):
+                ellipse_data = {
+                    'type': 'ellipse',
+                    'color': item.pen().color().name(),
+                    'width': item.pen().widthF(),
+                    'rect': [item.rect().x(), item.rect().y(), item.rect().width(), item.rect().height()]
+                }
+                data['items'].append(ellipse_data)
 
                 # Extract points from the path
-                for subpath in item.path().toSubpathPolygons():  # to SubpathPolygons method is used to break down
-                    # the complex line into sub parts and store it
-                    line_data['points'].extend([(point.x(), point.y()) for point in subpath])
+               # for subpath in item.path().toSubpathPolygons():  # to SubpathPolygons method is used to break down
+                #    # the complex line into sub parts and store it
+                 #   line_data['points'].extend([(point.x(), point.y()) for point in subpath])
 
-                data['lines'].append(line_data)
-            
         circular_send_buffer.appendleft(data)
         # signal_manager.data_sig.emit(data, self.undo_flag)
 
@@ -180,7 +251,7 @@ class BoardScene(QGraphicsScene):
             undo_flag = data['flag']
 
             self.drawing = True
-            prev = {'lines': [],  # stores info of each line drawn
+            prev = {'items': [],  # stores info of each line drawn
                     'scene_rect': [],  # stores dimension of scene
                     'color': "",  # store the color used
                     'size': 20  # store the size of the pen
@@ -203,10 +274,12 @@ class BoardScene(QGraphicsScene):
                     else:
                         pass
                     # Add lines to the scene
-                    if 'lines' in scene_file:
-                        for line_data in scene_file['lines']:
+                    if 'items' in scene_file:
+                        for line_data in scene_file['items']:
                             path = QPainterPath()
                             path.moveTo(line_data['points'][0][0], line_data['points'][0][1])
+                            for point in line_data['points'][1:]:
+                                path.lineTo(point[0], point[1])
 
                             for subpath in line_data['points'][1:]:
                                 path.lineTo(subpath[0], subpath[1])
@@ -215,8 +288,22 @@ class BoardScene(QGraphicsScene):
                             my_pen = QPen(QColor(line_data['color']), line_data['width'])
                             my_pen.setCapStyle(Qt.PenCapStyle.RoundCap)
                             pathItem.setPen(my_pen)
-                            pathItem.setZValue(self.itemsBoundingRect().height() + 1)
+                            # pathItem.setZValue(self.itemsBoundingRect().height() + 1)
                             self.addItem(pathItem)
+                    elif scene_file['type'] == 'rectangle':
+                        rect_data = scene_file['rect']
+                        rect = QRectF(rect_data[0], rect_data[1], rect_data[2], rect_data[3])
+                        rectItem = QGraphicsRectItem(rect)
+                        my_pen = QPen(QColor(scene_file['color']), scene_file['width'])
+                        rectItem.setPen(my_pen)
+                        self.addItem(rectItem)
+                    elif scene_file['type'] == 'ellipse':
+                        ellipse_data = scene_file['rect']
+                        rect = QRectF(ellipse_data[0], ellipse_data[1], ellipse_data[2], ellipse_data[3])
+                        ellipseItem = QGraphicsEllipseItem(rect)
+                        my_pen = QPen(QColor(scene_file['color']), scene_file['width'])
+                        ellipseItem.setPen(my_pen)
+                        self.addItem(ellipseItem)
             except IndexError as e:
                 print(e)
         else:
@@ -235,11 +322,14 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.setupUi(self)
         ############################################################################################################
         # Ensure all buttons behave properly when clicked
-        self.list_of_buttons = [self.pb_Pen, self.pb_Eraser]
+        self.list_of_buttons = [self.pb_Pen, self.pb_Eraser, self.pb_Line, self.pb_Ellipse, self.pb_Rectangle]
 
         self.pb_Pen.setChecked(True)
         self.pb_Pen.clicked.connect(self.button_clicked)
         self.pb_Eraser.clicked.connect(self.button_clicked)
+        self.pb_Line.clicked.connect(self.button_clicked)
+        self.pb_Ellipse.clicked.connect(self.button_clicked)
+        self.pb_Rectangle.clicked.connect(self.button_clicked)
 
         self.current_color = QColor("#000000")
 
@@ -249,7 +339,8 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.actionNew.triggered.connect(self.new_file)
         self.actionClose.triggered.connect(self.close_window)
         self.actionSave_As.triggered.connect(self.save_file)
-        self.actionOpen.triggered.connect(self.load_file)
+        self.actionOpen_2.triggered.connect(self.load_file)
+        self.actionSave_2.triggered.connect(self.save)
 
         # Define what the tool buttons do
         ###########################################################################################################
@@ -265,6 +356,9 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.pb_Color.clicked.connect(self.color_dialog)
         self.pb_Undo.clicked.connect(self.undo)
         self.pb_Redo.clicked.connect(self.redo)
+        self.pb_Line.clicked.connect(self.toggle_line_mode)
+        self.pb_Ellipse.clicked.connect(self.toggle_ellipse_mode)
+        self.pb_Rectangle.clicked.connect(self.toggle_rectangle_mode)
         ###########################################################################################################
 
         self.scene = BoardScene()
@@ -272,64 +366,126 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.gv_Canvas.setRenderHint(QPainter.RenderHint.Antialiasing, True)
 
         self.redo_list = []
+        self.current_file = None
 
     def save_file(self):
-        filename, _ = QFileDialog.getSaveFileName(self, "Save File", "", "Whiteboard Files (*.json)")  # open dialog
-        # window to save file
+        filename, _ = QFileDialog.getSaveFileName(self, "Save File", "", "Whiteboard Files (*.json)")
         if filename:
             data = {
-                'lines': [],  # stores info of each line drawn
-                'scene_rect': [self.scene.width(), self.scene.height()],  # stores dimension of scene
-                'color': self.scene.color.name(),  # store the color used
-                'size': self.scene.size  # store the size of the pen
+                'items': [],
+                'scene_rect': [self.scene.width(), self.scene.height()],
+                'color': self.scene.color.name(),
+                'size': self.scene.size
             }
-            # loop for checking of drawn path
-            for item in self.scene.items():
+            for item in reversed(self.scene.items()):
                 if isinstance(item, QGraphicsPathItem):
                     line_data = {
+                        'type': 'path',
                         'color': item.pen().color().name(),
                         'width': item.pen().widthF(),
-                        'points': []  # stores the (X,Y) coordinate of the line
+                        'points': [(point.x(), point.y()) for subpath in item.path().toSubpathPolygons() for point in
+                                   subpath]
                     }
-
-                    # Extract points from the path
-                    for subpath in item.path().toSubpathPolygons():  # to SubpathPolygons method is used to break down
-                        # the complex line into sub parts and store it
-                        line_data['points'].extend([(point.x(), point.y()) for point in subpath])
-
-                    data['lines'].append(line_data)
+                    data['items'].append(line_data)
+                elif isinstance(item, QGraphicsRectItem):
+                    rect_data = {
+                        'type': 'rectangle',
+                        'color': item.pen().color().name(),
+                        'width': item.pen().widthF(),
+                        'rect': [item.rect().x(), item.rect().y(), item.rect().width(), item.rect().height()]
+                    }
+                    data['items'].append(rect_data)
+                elif isinstance(item, QGraphicsEllipseItem):
+                    ellipse_data = {
+                        'type': 'ellipse',
+                        'color': item.pen().color().name(),
+                        'width': item.pen().widthF(),
+                        'rect': [item.rect().x(), item.rect().y(), item.rect().width(), item.rect().height()]
+                    }
+                    data['items'].append(ellipse_data)
 
             with open(filename, 'w') as file:
                 json.dump(data, file)
 
     def load_file(self):
-        filename, _ = QFileDialog.getOpenFileName(self, "Open File", "", "Whiteboard Files (*.json)")  # open dialog
-        # window to Open the file
-        if filename:  # reading the file
+        filename, _ = QFileDialog.getOpenFileName(self, "Open File", "", "Whiteboard Files (*.json)")
+        if filename:
+            self.current_file = filename
             with open(filename, 'r') as file:
                 data = json.load(file)
 
             self.scene.clear()
-
-            # Set scene properties
             self.scene.setSceneRect(0, 0, data['scene_rect'][0], data['scene_rect'][1])
             self.scene.change_color(QColor(data['color']))
             self.scene.change_size(data['size'])
 
-            # Add lines to the scene
-            for line_data in data['lines']:
-                path = QPainterPath()
-                path.moveTo(line_data['points'][0][0], line_data['points'][0][1])
+            for item_data in data['items']:
+                if item_data['type'] == 'path':
+                    path = QPainterPath()
+                    path.moveTo(item_data['points'][0][0], item_data['points'][0][1])
+                    for point in item_data['points'][1:]:
+                        path.lineTo(point[0], point[1])
 
-                for subpath in line_data['points'][1:]:
-                    path.lineTo(subpath[0], subpath[1])
+                    pathItem = QGraphicsPathItem(path)
+                    my_pen = QPen(QColor(item_data['color']), item_data['width'])
+                    my_pen.setCapStyle(Qt.PenCapStyle.RoundCap)
+                    pathItem.setPen(my_pen)
+                    self.scene.addItem(pathItem)
+                elif item_data['type'] == 'rectangle':
+                    rect_data = item_data['rect']
+                    rect = QRectF(rect_data[0], rect_data[1], rect_data[2], rect_data[3])
+                    rectItem = QGraphicsRectItem(rect)
+                    my_pen = QPen(QColor(item_data['color']), item_data['width'])
+                    rectItem.setPen(my_pen)
+                    self.scene.addItem(rectItem)
+                elif item_data['type'] == 'ellipse':
+                    ellipse_data = item_data['rect']
+                    rect = QRectF(ellipse_data[0], ellipse_data[1], ellipse_data[2], ellipse_data[3])
+                    ellipseItem = QGraphicsEllipseItem(rect)
+                    my_pen = QPen(QColor(item_data['color']), item_data['width'])
+                    ellipseItem.setPen(my_pen)
+                    self.scene.addItem(ellipseItem)
+            data.clear()
 
-                pathItem = QGraphicsPathItem(path)
-                my_pen = QPen(QColor(line_data['color']), line_data['width'])
-                my_pen.setCapStyle(Qt.PenCapStyle.RoundCap)
-                pathItem.setPen(my_pen)
+    def save(self):
+        if self.current_file:
+            data = {
+                'items': [],
+                'scene_rect': [self.scene.width(), self.scene.height()],
+                'color': self.scene.color.name(),
+                'size': self.scene.size
+            }
+            for item in reversed(self.scene.items()):
+                if isinstance(item, QGraphicsPathItem):
+                    line_data = {
+                        'type': 'path',
+                        'color': item.pen().color().name(),
+                        'width': item.pen().widthF(),
+                        'points': [(point.x(), point.y()) for subpath in item.path().toSubpathPolygons() for point in
+                                   subpath]
+                    }
+                    data['items'].append(line_data)
+                elif isinstance(item, QGraphicsRectItem):
+                    rect_data = {
+                        'type': 'rectangle',
+                        'color': item.pen().color().name(),
+                        'width': item.pen().widthF(),
+                        'rect': [item.rect().x(), item.rect().y(), item.rect().width(), item.rect().height()]
+                    }
+                    data['items'].append(rect_data)
+                elif isinstance(item, QGraphicsEllipseItem):
+                    ellipse_data = {
+                        'type': 'ellipse',
+                        'color': item.pen().color().name(),
+                        'width': item.pen().widthF(),
+                        'rect': [item.rect().x(), item.rect().y(), item.rect().width(), item.rect().height()]
+                    }
+                    data['items'].append(ellipse_data)
 
-                self.scene.addItem(pathItem)
+            with open(self.current_file, 'w') as file:
+                json.dump(data, file)
+        else:
+            self.save_file()
 
     def close_window(self):
         self.close()
@@ -368,6 +524,16 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         if self.pb_Eraser.isChecked():
             self.pb_Eraser.setChecked(False)
             self.pb_Pen.setChecked(True)
+        elif self.pb_Pen.isChecked():
+            self.current_color = current_color
+
+    def deselect_current_mode(self):
+        self.scene.line_mode = False
+        self.scene.ellipse_mode = False
+        self.scene.rectangle_mode = False
+        self.pb_Line.setChecked(False)
+        self.pb_Ellipse.setChecked(False)
+        self.pb_Rectangle.setChecked(False)
 
     def color_changed(self, color):
         self.scene.change_color(color)
@@ -376,11 +542,30 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         # self.erase_path(self.scene.drawn_paths)
 
     def button_clicked(self):
+        self.deselect_current_mode()
+
         sender_button = self.sender()
         for btn in self.list_of_buttons:
             if btn is not sender_button:
                 btn.setChecked(False)
 
+    def toggle_line_mode(self):
+        self.deselect_current_mode()
+        self.scene.set_line_mode(True)
+        self.pb_Line.setChecked(True)
+        self.scene.set_tool("Line")
+
+    def toggle_ellipse_mode(self):
+        self.deselect_current_mode()
+        self.scene.set_ellipse_mode(True)
+        self.pb_Ellipse.setChecked(True)
+        self.scene.set_tool("Ellipse")
+
+    def toggle_rectangle_mode(self):
+        self.deselect_current_mode()
+        self.scene.set_rectangle_mode(True)
+        self.pb_Rectangle.setChecked(True)
+        self.scene.set_tool("Rectangle")
 
 def update_data(data_recv: dict):
     global circular_recv_buffer
