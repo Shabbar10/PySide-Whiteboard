@@ -76,7 +76,6 @@ class BoardScene(QGraphicsScene):
         self.recv_timer.timeout.connect(self.sender_control)
         self.send_timer.start()
 
-
     def change_color(self, color):
         self.color = color
 
@@ -153,13 +152,15 @@ class BoardScene(QGraphicsScene):
                 self.path.lineTo(curr_position)
                 self.pathItem.setPath(self.path)
                 self.previous_position = curr_position
+                signal_manager.data_updated.emit(False)
 
             # signal_manager.function_call.emit(True)
-            signal_manager.data_updated.emit(False)
+
     def mouseReleaseEvent(self, event):
         if event.button() == Qt.MouseButton.LeftButton:
             self.drawing = False
             if self.line_mode or self.ellipse_mode or self.rectangle_mode:
+                signal_manager.data_updated.emit(False)
                 self.pathItem = None
             else:
                 self.drawn_paths.append(self.path)
@@ -169,18 +170,6 @@ class BoardScene(QGraphicsScene):
             g_length += 1
             signal_manager.data_updated.emit(False)
 
-
-    def dummy(self):
-        data = {
-            'lines': [],  # stores info of each line drawn
-            'scene_rect': [self.width(), self.height()],  # stores dimension of scene
-            'color': self.color.name(),  # store the color used
-            'size': self.size,  # store the size of the pen
-            'next_size': 0,
-        }
-
-        self.data_list.append(data)
-
     def sender_control(self):
         global circular_send_buffer
         if len(circular_send_buffer) > 0:
@@ -189,7 +178,6 @@ class BoardScene(QGraphicsScene):
             signal_manager.data_sig.emit(temp, self.undo_flag)
         else:
             pass
-
 
     def scene_file(self, flag):
         global circular_send_buffer
@@ -211,10 +199,11 @@ class BoardScene(QGraphicsScene):
             item = new_items[item_index]
             if isinstance(item, QGraphicsPathItem):
                 line_data = {
+                    'type': 'path',
                     'color': item.pen().color().name(),
                     'width': item.pen().widthF(),
                     'points': [(point.x(), point.y()) for subpath in item.path().toSubpathPolygons() for point in
-                                   subpath]  # stores the (X,Y) coordinate of the line
+                               subpath]  # stores the (X,Y) coordinate of the line
                 }
                 data['items'].append(line_data)
             elif isinstance(item, QGraphicsRectItem):
@@ -234,10 +223,12 @@ class BoardScene(QGraphicsScene):
                 }
                 data['items'].append(ellipse_data)
 
-                # Extract points from the path
-               # for subpath in item.path().toSubpathPolygons():  # to SubpathPolygons method is used to break down
-                #    # the complex line into sub parts and store it
-                 #   line_data['points'].extend([(point.x(), point.y()) for point in subpath])
+            print(f"Data is: {data}")
+
+            # Extract points from the path
+            # for subpath in item.path().toSubpathPolygons():  # to SubpathPolygons method is used to break down
+            #    # the complex line into sub parts and store it
+            #   line_data['points'].extend([(point.x(), point.y()) for point in subpath])
 
         circular_send_buffer.appendleft(data)
         # signal_manager.data_sig.emit(data, self.undo_flag)
@@ -247,6 +238,7 @@ class BoardScene(QGraphicsScene):
         if len(circular_recv_buffer) > 0:
             data = circular_recv_buffer.pop()
             scene_file = data['scene_info']
+            # print(f"Scene: {scene_file}")
 
             undo_flag = data['flag']
 
@@ -275,35 +267,35 @@ class BoardScene(QGraphicsScene):
                         pass
                     # Add lines to the scene
                     if 'items' in scene_file:
-                        for line_data in scene_file['items']:
-                            path = QPainterPath()
-                            path.moveTo(line_data['points'][0][0], line_data['points'][0][1])
-                            for point in line_data['points'][1:]:
-                                path.lineTo(point[0], point[1])
+                        if scene_file['items'][0]['type'] == 'path':
+                            for line_data in scene_file['items']:
+                                path = QPainterPath()
+                                path.moveTo(line_data['points'][0][0], line_data['points'][0][1])
 
-                            for subpath in line_data['points'][1:]:
-                                path.lineTo(subpath[0], subpath[1])
+                                for subpath in line_data['points'][1:]:
+                                    path.lineTo(subpath[0], subpath[1])
 
-                            pathItem = QGraphicsPathItem(path)
-                            my_pen = QPen(QColor(line_data['color']), line_data['width'])
-                            my_pen.setCapStyle(Qt.PenCapStyle.RoundCap)
-                            pathItem.setPen(my_pen)
-                            # pathItem.setZValue(self.itemsBoundingRect().height() + 1)
-                            self.addItem(pathItem)
-                    elif scene_file['type'] == 'rectangle':
-                        rect_data = scene_file['rect']
-                        rect = QRectF(rect_data[0], rect_data[1], rect_data[2], rect_data[3])
-                        rectItem = QGraphicsRectItem(rect)
-                        my_pen = QPen(QColor(scene_file['color']), scene_file['width'])
-                        rectItem.setPen(my_pen)
-                        self.addItem(rectItem)
-                    elif scene_file['type'] == 'ellipse':
-                        ellipse_data = scene_file['rect']
-                        rect = QRectF(ellipse_data[0], ellipse_data[1], ellipse_data[2], ellipse_data[3])
-                        ellipseItem = QGraphicsEllipseItem(rect)
-                        my_pen = QPen(QColor(scene_file['color']), scene_file['width'])
-                        ellipseItem.setPen(my_pen)
-                        self.addItem(ellipseItem)
+                                pathItem = QGraphicsPathItem(path)
+                                my_pen = QPen(QColor(line_data['color']), line_data['width'])
+                                my_pen.setCapStyle(Qt.PenCapStyle.RoundCap)
+                                pathItem.setPen(my_pen)
+                                self.addItem(pathItem)
+
+                        elif scene_file['type'] == 'rectangle':
+                            rect_data = scene_file['rect']
+                            rect = QRectF(rect_data[0], rect_data[1], rect_data[2], rect_data[3])
+                            rectItem = QGraphicsRectItem(rect)
+                            my_pen = QPen(QColor(scene_file['color']), scene_file['width'])
+                            rectItem.setPen(my_pen)
+                            self.addItem(rectItem)
+
+                        elif scene_file['type'] == 'ellipse':
+                            ellipse_data = scene_file['rect']
+                            rect = QRectF(ellipse_data[0], ellipse_data[1], ellipse_data[2], ellipse_data[3])
+                            ellipseItem = QGraphicsEllipseItem(rect)
+                            my_pen = QPen(QColor(scene_file['color']), scene_file['width'])
+                            ellipseItem.setPen(my_pen)
+                            self.addItem(ellipseItem)
             except IndexError as e:
                 print(e)
         else:
@@ -567,12 +559,14 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.pb_Rectangle.setChecked(True)
         self.scene.set_tool("Rectangle")
 
+
 def update_data(data_recv: dict):
     global circular_recv_buffer
     global buffer_flag
     circular_recv_buffer.appendleft(data_recv)
-    print(circular_recv_buffer)
+    # print(circular_recv_buffer)
     buffer_flag = 1
+
 
 class LoginWindow(QWidget):
     def __init__(self):
@@ -592,7 +586,6 @@ class LoginWindow(QWidget):
         palette.setBrush(QPalette.Window, gradient)
         self.setPalette(palette)
 
-
         layout = QVBoxLayout()
 
         # Username Section
@@ -600,24 +593,26 @@ class LoginWindow(QWidget):
         self.username_input.setFixedHeight(50)
         self.username_input.setPlaceholderText("Username")  # Set placeholder text for username input box
         self.username_input.setFont(QFont("Arial", 12))  # Set custom font for the input text
-        self.username_input.setStyleSheet("QLineEdit { padding: 10px 20px; margin-left: 30px; margin-right: 30px;}") # Set margin and padding
+        self.username_input.setStyleSheet(
+            "QLineEdit { padding: 10px 20px; margin-left: 30px; margin-right: 30px;}")  # Set margin and padding
         layout.addWidget(self.username_input)
 
         # Password Section
         self.password_input = QLineEdit()
         self.password_input.setFixedHeight(50)
         self.password_input.setPlaceholderText("Password")  # Set placeholder text for password input box
-        self.password_input.setEchoMode(QLineEdit.EchoMode.Password) # Setting to password mode to display dots
+        self.password_input.setEchoMode(QLineEdit.EchoMode.Password)  # Setting to password mode to display dots
         self.password_input.setFont(QFont("Arial", 12))  # Set custom font for the input text
-        self.password_input.setStyleSheet("QLineEdit { padding: 10px 20px; margin-left: 30px; margin-right: 30px;}") # Set margin and padding
+        self.password_input.setStyleSheet(
+            "QLineEdit { padding: 10px 20px; margin-left: 30px; margin-right: 30px;}")  # Set margin and padding
         layout.addWidget(self.password_input)
 
         # Login Button
         self.login_button = QPushButton("LOGIN")
         self.login_button.setFixedHeight(50)
-        self.login_button.clicked.connect(self.login) # Connecting it to login function
+        self.login_button.clicked.connect(self.login)  # Connecting it to login function
         self.login_button.setStyleSheet(
-            "QPushButton { background-color: #4CAF50; color: white; padding: 10px 20px; font-size: 20px; margin-left: 30px; margin-right: 30px; font-weight: bold;}" )# Styling the button
+            "QPushButton { background-color: #4CAF50; color: white; padding: 10px 20px; font-size: 20px; margin-left: 30px; margin-right: 30px; font-weight: bold;}")  # Styling the button
         layout.addWidget(self.login_button)
 
         self.setLayout(layout)
@@ -646,13 +641,9 @@ def validate_credentials(username: str, pwd: str):
     print(login_flag)
 
 
-
 def init_gui():
     app = QApplication()
     window = MainWindow()
-
-
-
 
     # Start the ping_server thread
     # ping_server_thread = threading.Thread(target=run_ping_server, args=(client,))
@@ -665,7 +656,6 @@ def init_gui():
     log.show()
     app.exec()
 
-    signal_manager.call_dummy.connect(window.scene.dummy)
     signal_manager.function_call.connect(window.scene.track_mouse_event)
     signal_manager.data_updated.connect(window.scene.scene_file)
     # signal_manager.data_ack.connect(window.scene.build_scene_file)

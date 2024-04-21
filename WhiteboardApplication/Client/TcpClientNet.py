@@ -67,6 +67,7 @@ class MyClient(QTcpSocket):
             #         # self.list_index = (self.list_index + 1) % 5
             #
             #         self.write(encoded)
+            print(f"Block: {block}")
             self.write(block)
             # self.flush()
             block.clear()
@@ -119,6 +120,7 @@ class MyClient(QTcpSocket):
                 # read_flag = False
             # if self.bytesAvailable() >= size:
                 data = self.read(size)  # Read the data
+                # print(f"Received: {data}")
                 # read_flag = True
 
                 json_data = json.loads(data.data().decode('utf-8'))
