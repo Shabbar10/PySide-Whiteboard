@@ -281,19 +281,19 @@ class BoardScene(QGraphicsScene):
                                 pathItem.setPen(my_pen)
                                 self.addItem(pathItem)
 
-                        elif scene_file['type'] == 'rectangle':
-                            rect_data = scene_file['rect']
+                        elif scene_file['items'][0]['type'] == 'rectangle':
+                            rect_data = scene_file['items'][0]['rect']
                             rect = QRectF(rect_data[0], rect_data[1], rect_data[2], rect_data[3])
                             rectItem = QGraphicsRectItem(rect)
-                            my_pen = QPen(QColor(scene_file['color']), scene_file['width'])
+                            my_pen = QPen(QColor(scene_file['items'][0]['color']), scene_file['items'][0]['width'])
                             rectItem.setPen(my_pen)
                             self.addItem(rectItem)
 
-                        elif scene_file['type'] == 'ellipse':
-                            ellipse_data = scene_file['rect']
+                        elif scene_file['items'][0]['type'] == 'ellipse':
+                            ellipse_data = scene_file['items'][0]['rect']
                             rect = QRectF(ellipse_data[0], ellipse_data[1], ellipse_data[2], ellipse_data[3])
                             ellipseItem = QGraphicsEllipseItem(rect)
-                            my_pen = QPen(QColor(scene_file['color']), scene_file['width'])
+                            my_pen = QPen(QColor(scene_file['items'][0]['color']), scene_file['items'][0]['width'])
                             ellipseItem.setPen(my_pen)
                             self.addItem(ellipseItem)
             except IndexError as e:
