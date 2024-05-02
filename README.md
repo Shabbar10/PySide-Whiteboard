@@ -1,5 +1,5 @@
 # Whiteboard Application
-Using PySide6 to make a Whiteboard with (potentially) over-the-network capabilities.
+Using PySide6 to make a Whiteboard with over-the-network capabilities.
 
 ## Progress So Far
 - Can draw
@@ -10,14 +10,15 @@ Using PySide6 to make a Whiteboard with (potentially) over-the-network capabilit
 - Undo & Redo
 - Open new whiteboard
 - Save and load whiteboards
+- Be able to draw shapes (ellipse, rectangle and straight line) using the mouse
+- Have users working on the same whiteboard from different PCs
+  <br>In this, have a main server as a TCP server, then connect to main server using QTcpSocket from the clients.
+  <br>Have redis store temporary info for sessions i.e. host and clients etc
 
 ## TODO
-- Be able to draw shapes (ellipse, rectangle and straight line) using the mouse
 - Have pages within a single whiteboard
 - Give access to users (Google Drive-esque) <br>
-- Have users working on the same whiteboard from different PCs
-  <br>In this, have a main server as a UDP server, then connect to main server using QUDPSocket from the clients.
-  <br>Have redis store temporary info for sessions i.e. host and clients etc
+- See about multithreading and proper message framing
 
 ## To Get Started
 Optional: Have a virtual environment: <br> `python -m venv <name of environemt>` <br><br>
