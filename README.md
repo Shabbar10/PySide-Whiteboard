@@ -20,6 +20,26 @@ Using PySide6 to make a Whiteboard with over-the-network capabilities.
 - Give access to users (Google Drive-esque) <br>
 - See about multithreading and proper message framing
 
+# Contributions
+1. Shabbar Adamjee
+  - Main UI
+  - Core functions (freehand drawing, erasing)
+  - Message framing for network communication
+
+2. Hussain Ceyloni
+  - Straight line, ellipse, and rectangle functionality
+  - Save/Save As, Load, Open functions
+  - Open new board function
+
+3. Atharva Ghanekar
+  - Established main server and client communication
+  - Message framing for network communication
+
+4. Abubakar Siddiq
+  - Undo & redo
+  - Login screen and function
+  - Database (redis) handling
+
 ## To Get Started
 Optional: Have a virtual environment: <br> `python -m venv <name of environemt>` <br><br>
 ### Activate environment: <br>
