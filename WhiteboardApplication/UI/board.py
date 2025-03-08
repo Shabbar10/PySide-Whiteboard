@@ -3,7 +3,7 @@
 ################################################################################
 ## Form generated from reading UI file 'board.ui'
 ##
-## Created by: Qt User Interface Compiler version 6.6.2
+## Created by: Qt User Interface Compiler version 6.8.2
 ##
 ## WARNING! All changes made in this file will be lost when recompiling UI file!
 ################################################################################
@@ -68,7 +68,7 @@ class Ui_MainWindow(object):
         self.pb_Redo = QPushButton(self.centralwidget)
         self.pb_Redo.setObjectName(u"pb_Redo")
         icon = QIcon()
-        icon.addFile(u":/Tools/redo.png", QSize(), QIcon.Normal, QIcon.Off)
+        icon.addFile(u":/Tools/redo.png", QSize(), QIcon.Mode.Normal, QIcon.State.Off)
         self.pb_Redo.setIcon(icon)
         self.pb_Redo.setCheckable(False)
 
@@ -77,7 +77,7 @@ class Ui_MainWindow(object):
         self.pb_Eraser = QPushButton(self.centralwidget)
         self.pb_Eraser.setObjectName(u"pb_Eraser")
         icon1 = QIcon()
-        icon1.addFile(u":/Tools/eraser.png", QSize(), QIcon.Normal, QIcon.Off)
+        icon1.addFile(u":/Tools/eraser.png", QSize(), QIcon.Mode.Normal, QIcon.State.Off)
         self.pb_Eraser.setIcon(icon1)
         self.pb_Eraser.setCheckable(True)
 
@@ -92,7 +92,7 @@ class Ui_MainWindow(object):
         self.pb_Rectangle = QPushButton(self.centralwidget)
         self.pb_Rectangle.setObjectName(u"pb_Rectangle")
         icon2 = QIcon()
-        icon2.addFile(u":/Tools/rect.png", QSize(), QIcon.Normal, QIcon.Off)
+        icon2.addFile(u":/Tools/rect.png", QSize(), QIcon.Mode.Normal, QIcon.State.Off)
         self.pb_Rectangle.setIcon(icon2)
         self.pb_Rectangle.setCheckable(True)
 
@@ -101,7 +101,7 @@ class Ui_MainWindow(object):
         self.pb_Pen = QPushButton(self.centralwidget)
         self.pb_Pen.setObjectName(u"pb_Pen")
         icon3 = QIcon()
-        icon3.addFile(u":/Tools/pen.png", QSize(), QIcon.Normal, QIcon.Off)
+        icon3.addFile(u":/Tools/pen.png", QSize(), QIcon.Mode.Normal, QIcon.State.Off)
         self.pb_Pen.setIcon(icon3)
         self.pb_Pen.setCheckable(True)
 
@@ -115,7 +115,7 @@ class Ui_MainWindow(object):
         self.pb_Undo = QPushButton(self.centralwidget)
         self.pb_Undo.setObjectName(u"pb_Undo")
         icon4 = QIcon()
-        icon4.addFile(u":/Tools/undo.png", QSize(), QIcon.Normal, QIcon.Off)
+        icon4.addFile(u":/Tools/undo.png", QSize(), QIcon.Mode.Normal, QIcon.State.Off)
         self.pb_Undo.setIcon(icon4)
         self.pb_Undo.setCheckable(False)
 
@@ -128,6 +128,8 @@ class Ui_MainWindow(object):
         sizePolicy1.setVerticalStretch(0)
         sizePolicy1.setHeightForWidth(self.gv_Canvas.sizePolicy().hasHeightForWidth())
         self.gv_Canvas.setSizePolicy(sizePolicy1)
+        self.gv_Canvas.setStyleSheet(u"QGraphicsView { background-color: white; }\n"
+"")
 
         self.gridLayout.addWidget(self.gv_Canvas, 0, 1, 11, 1)
 
@@ -138,7 +140,7 @@ class Ui_MainWindow(object):
         self.pb_Line = QPushButton(self.centralwidget)
         self.pb_Line.setObjectName(u"pb_Line")
         icon5 = QIcon()
-        icon5.addFile(u":/Tools/line.png", QSize(), QIcon.Normal, QIcon.Off)
+        icon5.addFile(u":/Tools/line.png", QSize(), QIcon.Mode.Normal, QIcon.State.Off)
         self.pb_Line.setIcon(icon5)
         self.pb_Line.setCheckable(True)
 
@@ -151,7 +153,7 @@ class Ui_MainWindow(object):
         self.pb_Ellipse = QPushButton(self.centralwidget)
         self.pb_Ellipse.setObjectName(u"pb_Ellipse")
         icon6 = QIcon()
-        icon6.addFile(u":/Tools/ellipse.png", QSize(), QIcon.Normal, QIcon.Off)
+        icon6.addFile(u":/Tools/ellipse.png", QSize(), QIcon.Mode.Normal, QIcon.State.Off)
         self.pb_Ellipse.setIcon(icon6)
         self.pb_Ellipse.setCheckable(True)
 
@@ -160,7 +162,7 @@ class Ui_MainWindow(object):
         MainWindow.setCentralWidget(self.centralwidget)
         self.menubar = QMenuBar(MainWindow)
         self.menubar.setObjectName(u"menubar")
-        self.menubar.setGeometry(QRect(0, 0, 1172, 22))
+        self.menubar.setGeometry(QRect(0, 0, 1172, 33))
         self.menuFile = QMenu(self.menubar)
         self.menuFile.setObjectName(u"menuFile")
         MainWindow.setMenuBar(self.menubar)
