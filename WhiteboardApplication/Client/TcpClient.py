@@ -28,6 +28,7 @@ from PySide6.QtGui import (
 
 from PySide6.QtCore import (
     Qt,
+    QObject,
     QTimer,
     QRectF
 )
@@ -108,7 +109,6 @@ class BoardScene(QGraphicsScene):
                 self.pathItem = QGraphicsRectItem()
                 self.pathItem.setPen(QPen(self.color, self.size))
                 self.addItem(self.pathItem)
-                print(self.items())
             elif self.line_mode:
                 self.drawing = True
                 self.start_pos = event.scenePos()
@@ -147,14 +147,12 @@ class BoardScene(QGraphicsScene):
             elif self.ellipse_mode:
                 rect = QRectF(self.start_pos, event.scenePos()).normalized()
                 self.pathItem.setRect(rect)
-            else:
+            else: # If freehand drawing
                 curr_position = event.scenePos()
                 self.path.lineTo(curr_position)
                 self.pathItem.setPath(self.path)
                 self.previous_position = curr_position
-                signal_manager.data_updated.emit(False)
-
-            # signal_manager.function_call.emit(True)
+                signal_manager.data_updated.emit(False) # False is for the undo flag
 
     def mouseReleaseEvent(self, event):
         if event.button() == Qt.MouseButton.LeftButton:
@@ -174,11 +172,11 @@ class BoardScene(QGraphicsScene):
         global circular_send_buffer
         if len(circular_send_buffer) > 0:
             temp = circular_send_buffer.pop()
-            print(f"Size : {len(temp)}, data : {temp}")
             signal_manager.data_sig.emit(temp, self.undo_flag)
         else:
             pass
 
+    # Take lines on the board, and serialize them for sending
     def scene_file(self, flag):
         global circular_send_buffer
         self.undo_flag = flag
@@ -223,22 +221,13 @@ class BoardScene(QGraphicsScene):
                 }
                 data['items'].append(ellipse_data)
 
-            print(f"Data is: {data}")
-
-            # Extract points from the path
-            # for subpath in item.path().toSubpathPolygons():  # to SubpathPolygons method is used to break down
-            #    # the complex line into sub parts and store it
-            #   line_data['points'].extend([(point.x(), point.y()) for point in subpath])
-
         circular_send_buffer.appendleft(data)
-        # signal_manager.data_sig.emit(data, self.undo_flag)
 
-    # def build_scene_file(self, data):
+    # Receive lines, parse them, and build up the scene
     def build_scene_file(self):
         if len(circular_recv_buffer) > 0:
             data = circular_recv_buffer.pop()
             scene_file = data['scene_info']
-            # print(f"Scene: {scene_file}")
 
             undo_flag = data['flag']
 
@@ -308,6 +297,19 @@ class BoardScene(QGraphicsScene):
             pass
 
 
+class SceneBuilderWorker(QObject):
+    def __init__(self):
+        super().__init__()
+
+class SceneSerializerWorker(QObject):
+    def __init__(self):
+        super().__init__()
+
+class SenderControlWorker(QObject):
+    def __init__(self):
+        super().__init__()
+
+
 class MainWindow(QMainWindow, Ui_MainWindow):
     def __init__(self):
         super().__init__()
@@ -356,9 +358,23 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.scene = BoardScene()
         self.gv_Canvas.setScene(self.scene)
         self.gv_Canvas.setRenderHint(QPainter.RenderHint.Antialiasing, True)
+        self.resize_scene()
 
         self.redo_list = []
         self.current_file = None
+
+    def showEvent(self, event, /):
+        self.resize_scene()
+        super().showEvent(event)
+
+    def resizeEvent(self, event):
+        self.resize_scene()
+        super().resizeEvent(event)
+
+    def resize_scene(self):
+        rect = self.gv_Canvas.viewport().rect()
+        print(rect)
+        self.scene.setSceneRect(0, 0, rect.width(), rect.height())
 
     def save_file(self):
         filename, _ = QFileDialog.getSaveFileName(self, "Save File", "", "Whiteboard Files (*.json)")
@@ -529,9 +545,6 @@ class MainWindow(QMainWindow, Ui_MainWindow):
 
     def color_changed(self, color):
         self.scene.change_color(color)
-        # self.scene.scene_file()
-        # self.scene_file()
-        # self.erase_path(self.scene.drawn_paths)
 
     def button_clicked(self):
         self.deselect_current_mode()
@@ -564,7 +577,6 @@ def update_data(data_recv: dict):
     global circular_recv_buffer
     global buffer_flag
     circular_recv_buffer.appendleft(data_recv)
-    # print(circular_recv_buffer)
     buffer_flag = 1
 
 
@@ -638,7 +650,6 @@ def validate_credentials(username: str, pwd: str):
     else:
         print("invalid username")
         login_flag = False
-    print(login_flag)
 
 
 def init_gui():

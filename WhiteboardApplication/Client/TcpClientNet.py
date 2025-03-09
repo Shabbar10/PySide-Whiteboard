@@ -54,7 +54,6 @@ class MyClient(QTcpSocket):
 
             block = QByteArray()
             stream = QDataStream(block, QIODevice.WriteOnly)
-            print(f"Size: {len(json_dump)}")
             stream.writeUInt32(len(json_dump))
             block.append(json_dump.encode('utf-8'))
 
@@ -67,7 +66,6 @@ class MyClient(QTcpSocket):
             #         # self.list_index = (self.list_index + 1) % 5
             #
             #         self.write(encoded)
-            print(f"Block: {block}")
             self.write(block)
             # self.flush()
             block.clear()
@@ -80,7 +78,6 @@ class MyClient(QTcpSocket):
         try:
             if not self.read_flag:
                 data = self.readAll().data()
-                print(f"The received size is {data.__sizeof__()}")
                 decoded_data = msgpack.unpackb(data)
                 # print(decoded_data)
                 next_size = decoded_data['next_size']
@@ -100,7 +97,6 @@ class MyClient(QTcpSocket):
                             break
             received_dict = json.loads(decoded_data[0])
             '''
-            print(f"This is what I've decoded: {decoded_data}")
             signal_manager.data_ack.emit(decoded_data)
 
         # except json.JSONDecodeError as e:
@@ -116,7 +112,6 @@ class MyClient(QTcpSocket):
                 # size = 0
             # if read_flag:
                 size = stream.readUInt32()  # Read the size
-                print(f"Size: {size}")
                 # read_flag = False
             # if self.bytesAvailable() >= size:
                 data = self.read(size)  # Read the data
