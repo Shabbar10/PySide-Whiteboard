@@ -101,14 +101,11 @@ class BoardScene(QGraphicsScene):
             self.pathItem.setPen(self.my_pen)
             self.addItem(self.pathItem)
 
-            # print(self.items())
             for item in self.items():
                 itemTypes.add(type(item).__name__)
 
-            # print(itemTypes)
             self.drawing_events("mousePressEvent")
 
-            # print(self.data)
             # itemTypes.clear()
             signal_manager.function_call.emit(True)
 
@@ -118,16 +115,12 @@ class BoardScene(QGraphicsScene):
             self.path.lineTo(curr_position)
             self.pathItem.setPath(self.path)
             self.previous_position = curr_position
-            # print(self.pathItem)
-            # print(self.items())
 
             for item in self.items():
                 itemTypes.add(type(item).__name__)
 
             self.drawing_events("mouseMoveEvent")
-            # print(self.data)
 
-            # print(itemTypes)
             # itemTypes.clear()
             signal_manager.function_call.emit(True)
 
@@ -218,7 +211,6 @@ class BoardScene(QGraphicsScene):
             self.drawing = False
             self.my_pen = None
             self.path = None
-            # print(f"Moved to point : {point}")
 
             # self.removeItem(self.pathItem)
             self.pathItem = None
@@ -297,7 +289,6 @@ class MainWindow(QMainWindow, Ui_MainWindow):
                         'points': [],  # stores the (X,Y) coordinate of the line
                         # 'z_value': item.zValue()  # Store the z-value
                     }
-                    # print(f"Item value : {item.zValue()}")
 
                     # Extract points from the path
                     for subpath in item.path().toSubpathPolygons():  # to SubpathPolygons method is used to break down
@@ -363,7 +354,6 @@ class MainWindow(QMainWindow, Ui_MainWindow):
     def undo(self):
         if self.scene.items():
             print('Undo called')
-            print(self.scene.items())
             latest_item = self.scene.items()
             self.redo_list.append(latest_item)
             self.scene.removeItem(latest_item[0])

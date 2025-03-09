@@ -29,8 +29,10 @@ from PySide6.QtGui import (
 from PySide6.QtCore import (
     Qt,
     QObject,
-    QTimer,
-    QRectF
+    Signal,
+    Slot,
+    QRectF,
+    QThread
 )
 import json
 from TcpClientNet import start_client, MyClient, signal_manager
@@ -43,7 +45,7 @@ circular_send_buffer = deque(maxlen=20)
 buffer_flag = 0
 login_flag = False
 itemTypes = set()
-validation_dict = {'Atharva': 'ghanekar', 'Abubakar': 'siddiq', 'Shabbar': 'adamjee', 'Hussain': 'ceyloni'}
+validation_dict = {'Atharva': 'ghanekar', 'Abubakar': 'siddiq', 'Shabbar': 'adamjee', 'Hussain': 'ceyloni', '': ''}
 
 
 class BoardScene(QGraphicsScene):
@@ -62,19 +64,42 @@ class BoardScene(QGraphicsScene):
         self.pathItem = None
         self.drawn_paths = []
         self.my_pen = None
-        self.recv_timer = QTimer()
-        self.recv_timer.setInterval(100)
-        self.recv_timer.timeout.connect(self.build_scene_file)
-        self.recv_timer.start()
+
         self.current_tool = None
         self.line_mode = False
         self.ellipse_mode = False
         self.rectangle_mode = False
 
-        self.send_timer = QTimer()
-        self.send_timer.setInterval(100)
-        self.recv_timer.timeout.connect(self.sender_control)
-        self.send_timer.start()
+        self.serializer_worker : SceneSerializerWorker = None
+        self.serializer_thread : QThread = None
+        self.builder_worker = None
+        self.builder_thread = None
+        self.setup_threads()
+
+    def setup_threads(self):
+        self.serializer_worker = SceneSerializerWorker(self)
+        self.serializer_thread = QThread()
+        self.serializer_worker.moveToThread(self.serializer_thread)
+        self.serializer_thread.start()
+        print("Serializer thread started")
+
+        self.builder_worker = SceneBuilderWorker()
+        self.builder_thread = QThread()
+        self.builder_thread.start()
+
+    def cleanup_threads(self):
+        workers = [self.serializer_worker, self.builder_worker]
+        threads = [self.serializer_thread, self.builder_thread]
+
+        for worker, thread in zip(workers, threads):
+            worker.deleteLater()
+            thread.quit()
+            thread.wait(3000)
+            if thread.isRunning():
+                thread.terminate()
+            thread.deleteLater()
+
+        print("All threads and workers cleaned up.")
 
     def change_color(self, color):
         self.color = color
@@ -150,74 +175,24 @@ class BoardScene(QGraphicsScene):
                 self.pathItem.setPath(self.path)
                 self.previous_position = curr_position
                 signal_manager.data_updated.emit(False) # False is for the undo flag
-                print("data_updated emitted from mouseMoveEvent")
 
     def mouseReleaseEvent(self, event):
         if event.button() == Qt.MouseButton.LeftButton:
             self.drawing = False
             if self.line_mode or self.ellipse_mode or self.rectangle_mode:
                 signal_manager.data_updated.emit(False)
-                print("data_updated emitted from mouseReleaseEvent line, ellipse, rect")
                 self.pathItem = None
             else:
                 self.drawn_paths.append(self.path)
                 self.pathItem = None
                 signal_manager.data_updated.emit(False)
-                print("data_updated emitted from mouseReleaseEvent freehand")
 
-    def sender_control(self):
-        global circular_send_buffer
-        if len(circular_send_buffer) > 0:
-            temp = circular_send_buffer.pop()
-            signal_manager.data_sig.emit(temp, self.undo_flag)
-        else:
-            pass
-
-    # Take lines on the board, and serialize them for sending
     def scene_file(self, flag):
-        global circular_send_buffer
-        self.undo_flag = flag
-        data = {
-            'item': {},  # stores info of each line drawn
-            'scene_rect': [self.width(), self.height()],  # stores dimension of scene
-            'color': self.color.name(),  # store the color used
-            'size': self.size,  # store the size of the pen
-        }
-
         reversed_items = self.items()[::-1]  # Only take stuff that is newly added since the last time
-        new_item = reversed_items[-1]
-        #for item_index in range(len(new_items)):
-        item = new_item
-        if isinstance(item, QGraphicsPathItem):
-            line_data = {
-                'type': 'path',
-                'color': item.pen().color().name(),
-                'width': item.pen().widthF(),
-                'points': [(point.x(), point.y()) for subpath in item.path().toSubpathPolygons() for point in
-                           subpath]  # stores the (X,Y) coordinate of the line
-            }
-            #data['items'].append(line_data)
-            data['item'] = line_data
-        elif isinstance(item, QGraphicsRectItem):
-            rect_data = {
-                'type': 'rectangle',
-                'color': item.pen().color().name(),
-                'width': item.pen().widthF(),
-                'rect': [item.rect().x(), item.rect().y(), item.rect().width(), item.rect().height()]
-            }
-            #data['items'].append(rect_data)
-            data['item'] = rect_data
-        elif isinstance(item, QGraphicsEllipseItem):
-            ellipse_data = {
-                'type': 'ellipse',
-                'color': item.pen().color().name(),
-                'width': item.pen().widthF(),
-                'rect': [item.rect().x(), item.rect().y(), item.rect().width(), item.rect().height()]
-            }
-            #data['items'].append(ellipse_data)
-            data['item'] = ellipse_data
+        if reversed_items:
+            new_item = reversed_items[-1]
+            self.serializer_worker.serialize_signal.emit(new_item, flag)
 
-        circular_send_buffer.appendleft(data)
 
     # Receive lines, parse them, and build up the scene
     def build_scene_file(self):
@@ -286,20 +261,54 @@ class BoardScene(QGraphicsScene):
         else:
             pass
 
-    def track_mouse_event(self, e):
-        if e is True:
-            self.scene_file(False)
-        else:
-            pass
-
 
 class SceneBuilderWorker(QObject):
     def __init__(self):
         super().__init__()
 
+
 class SceneSerializerWorker(QObject):
-    def __init__(self):
+    serialize_signal = Signal(QObject, bool)
+
+    def __init__(self, scene):
         super().__init__()
+        print("Inside the serializer thread")
+        self.scene = scene
+        self.serialize_signal.connect(self.serialize_item)
+
+    @Slot(object, bool)
+    def serialize_item(self, item, flag):
+        print(f"Item: {item}")
+        data = {}
+
+        if isinstance(item, QGraphicsPathItem):
+            line_data = {
+                'type': 'path',
+                'color': item.pen().color().name(),
+                'width': item.pen().width(),
+                'points': [(point.x(), point.y()) for subpath in item.path().toSubpathPolygons() for point in subpath]
+            }
+            data = line_data
+        elif isinstance(item, QGraphicsRectItem):
+            rect_data = {
+                'type': 'rectangle',
+                'color': item.pen().color().name(),
+                'width': item.pen().width(),
+                'points': [item.rect().x(), item.rect().y(), item.rect().width(), item.rect().height()]
+            }
+            data = rect_data
+        elif isinstance(item, QGraphicsEllipseItem):
+            ellipse_data = {
+                'type': 'ellipse',
+                'color': item.pen().color().name(),
+                'width': item.pen().width(),
+                'points': [item.rect().x(), item.rect().y(), item.rect().width(), item.rect().height()]
+            }
+            data = ellipse_data
+        print("Data set")
+        signal_manager.data_serialized.emit(data, flag)
+        print("data_serialized emitted")
+
 
 class SenderControlWorker(QObject):
     def __init__(self):
@@ -569,6 +578,10 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.pb_Rectangle.setChecked(True)
         self.scene.set_tool("Rectangle")
 
+    def closeEvent(self, event):
+        self.scene.cleanup_threads()
+        super().closeEvent(event)
+
 
 def update_data(data_recv: dict):
     global circular_recv_buffer
@@ -653,35 +666,24 @@ def init_gui():
     app = QApplication()
     window = MainWindow()
 
-    # Start the ping_server thread
-    # ping_server_thread = threading.Thread(target=run_ping_server, args=(client,))
-    # ping_server_thread.start()
-    #
-    # # Start the build_scene thread
-    # build_scene_thread = threading.Thread(target=run_build_scene, args=(window,))
-    # build_scene_thread.start()
     log = LoginWindow()
     log.show()
     app.exec()
 
-    #signal_manager.function_call.connect(window.scene.track_mouse_event)
-    #signal_manager.data_updated.connect(window.scene.scene_file)
-    # signal_manager.data_ack.connect(window.scene.build_scene_file)
     signal_manager.data_ack.connect(update_data)
 
-    signal_manager.send_info2.connect(validate_credentials)
-    signal_manager.function_call.connect(window.scene.track_mouse_event)
+    signal_manager.send_info.connect(validate_credentials)
     signal_manager.data_updated.connect(window.scene.scene_file)
     signal_manager.data_ack.connect(window.scene.build_scene_file)
 
     username = log.username_input.text()
     pwd = log.password_input.text()
-    signal_manager.send_info2.emit(username, pwd)
+    signal_manager.send_info.emit(username, pwd)
 
     if login_flag:
         client = MyClient()
         start_client(client)
-        signal_manager.data_sig.connect(client.ping_server)
+        signal_manager.data_serialized.connect(client.ping_server)
         window.show()
         app.exec()
     else:

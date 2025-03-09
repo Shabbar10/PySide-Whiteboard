@@ -6,15 +6,12 @@ class SignalManager(QObject):
     def __init__(self):
         super(SignalManager, self).__init__()
 
-    function_call = Signal(bool)
-    data_updated = Signal(list)
-    receive_data = Signal(int, int)
-    send_info = Signal(dict)
-    send_info2 = Signal(str, str)
-    call_dummy = Signal()
+    function_call = Signal(bool) # Call scene_file if undo/redo
+    data_updated = Signal(list) # Call scene_file if new shape is drawn
+    data_serialized = Signal(dict, bool) # Now send to server
 
+    send_info = Signal(str, str)
     action_signal = Signal(dict)
-    data_sig = Signal(dict, bool)
     data_ack = Signal(dict)
     login_verify = Signal(bool)
 

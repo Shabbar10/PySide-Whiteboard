@@ -30,24 +30,19 @@ class MyClient(QTcpSocket):
         self.connected.connect(self.ping_server)
         self.data_file = {'scene_file': {},
                           'flag': False}
-        print("Signal connected")
         self.sending_list = []
         self.flag = False
         self.read_flag = False
 
-
-
         # self.readyRead.connect(self.read_data)
         self.readyRead.connect(self.another_read)
-
-
-
 
     def ping_server(self, scene_info, flag):
         self.data_file = {
             'scene_info': scene_info,
             'flag': flag
         }
+        print(f"Data file: {self.data_file}")
 
         if self.state() == QAbstractSocket.SocketState.ConnectedState:
             json_dump = json.dumps(self.data_file)
@@ -57,21 +52,8 @@ class MyClient(QTcpSocket):
             stream.writeUInt32(len(json_dump))
             block.append(json_dump.encode('utf-8'))
 
-            # if self.flag:
-            #     if self.state() == QAbstractSocket.SocketState.ConnectedState:
-            #         # json_dump = json.dumps(self.data_file)
-            #         # encoded = json_dump.encode('utf-32')
-            #         encoded = msgpack.packb(self.sending_list.pop(0))
-            #         print("Encoded length : ", len(encoded))
-            #         # self.list_index = (self.list_index + 1) % 5
-            #
-            #         self.write(encoded)
             self.write(block)
-            # self.flush()
             block.clear()
-            # print(f"{len(json_dump)} : {self.data_file}")
-
-
 
     def read_data(self):
         next_size = 0
@@ -79,7 +61,6 @@ class MyClient(QTcpSocket):
             if not self.read_flag:
                 data = self.readAll().data()
                 decoded_data = msgpack.unpackb(data)
-                # print(decoded_data)
                 next_size = decoded_data['next_size']
                 self.read_flag = True
             else:
@@ -125,34 +106,13 @@ class MyClient(QTcpSocket):
             print("Error decoding JSON:", e)
         else:
             signal_manager.data_ack.emit(json_data)
-            # self.flush()
-            # Handle the decoding error, such as logging or ignoring the data
-        # while self.bytesAvailable() > 0:
-        #     if self.bytesAvailable() < 4:  # If no int of size is there
-        #         # return
-        #         print("Size less than 4 bytes")
-        #         break
-        #
-        #     size = stream.readUInt32()  # read the size
-        #     print(f"Size: {size}")
-        #     try:
-        #         while True:
-        #             if self.bytesAvailable() < size:  # if amount of data is not enough
-        #                 continue
-        #             else:
-        #                 data = self.read(size)
-        #                 # print(data)
-        #                 json_data = json.loads(data.data().decode('utf-8'))
-        #                 signal_manager.data_ack.emit(json_data)
-        #                 break
-        #     except Exception as e:
-        #         print(e)
 
 
 def start_client(client: MyClient):
     # ip = get_ipv6_address()
     # client.connectToHost(QHostAddress("192.168.201.204"), 8080)
-    client.connectToHost(QHostAddress("192.168.1.14"), 8080)
+    #client.connectToHost(QHostAddress("192.168.1.14"), 8080)
+    client.connectToHost(QHostAddress("192.168.29.173"), 8080)
 
     # ip = get_ipv6_address()
     # client.connectToHost(QHostAddress("192.168.1.14"), 8080)
