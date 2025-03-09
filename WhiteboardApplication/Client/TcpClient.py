@@ -41,7 +41,6 @@ itemTypes = set()
 circular_recv_buffer = deque(maxlen=20)
 circular_send_buffer = deque(maxlen=20)
 buffer_flag = 0
-g_length = 0
 login_flag = False
 itemTypes = set()
 validation_dict = {'Atharva': 'ghanekar', 'Abubakar': 'siddiq', 'Shabbar': 'adamjee', 'Hussain': 'ceyloni'}
@@ -132,8 +131,6 @@ class BoardScene(QGraphicsScene):
                 self.pathItem.setPen(my_pen)
                 self.addItem(self.pathItem)
 
-            # signal_manager.call_dummy.emit()
-
     def mouseMoveEvent(self, event):
         if self.drawing:
             if self.rectangle_mode:
@@ -153,20 +150,20 @@ class BoardScene(QGraphicsScene):
                 self.pathItem.setPath(self.path)
                 self.previous_position = curr_position
                 signal_manager.data_updated.emit(False) # False is for the undo flag
+                print("data_updated emitted from mouseMoveEvent")
 
     def mouseReleaseEvent(self, event):
         if event.button() == Qt.MouseButton.LeftButton:
             self.drawing = False
             if self.line_mode or self.ellipse_mode or self.rectangle_mode:
                 signal_manager.data_updated.emit(False)
+                print("data_updated emitted from mouseReleaseEvent line, ellipse, rect")
                 self.pathItem = None
             else:
                 self.drawn_paths.append(self.path)
                 self.pathItem = None
-
-            global g_length
-            g_length += 1
-            signal_manager.data_updated.emit(False)
+                signal_manager.data_updated.emit(False)
+                print("data_updated emitted from mouseReleaseEvent freehand")
 
     def sender_control(self):
         global circular_send_buffer
@@ -181,45 +178,44 @@ class BoardScene(QGraphicsScene):
         global circular_send_buffer
         self.undo_flag = flag
         data = {
-            'items': [],  # stores info of each line drawn
+            'item': {},  # stores info of each line drawn
             'scene_rect': [self.width(), self.height()],  # stores dimension of scene
             'color': self.color.name(),  # store the color used
             'size': self.size,  # store the size of the pen
         }
 
-        global g_length
         reversed_items = self.items()[::-1]  # Only take stuff that is newly added since the last time
-        if g_length != 0:
-            new_items = reversed_items[g_length:]
-        else:
-            new_items = reversed_items
-        for item_index in range(len(new_items)):
-            item = new_items[item_index]
-            if isinstance(item, QGraphicsPathItem):
-                line_data = {
-                    'type': 'path',
-                    'color': item.pen().color().name(),
-                    'width': item.pen().widthF(),
-                    'points': [(point.x(), point.y()) for subpath in item.path().toSubpathPolygons() for point in
-                               subpath]  # stores the (X,Y) coordinate of the line
-                }
-                data['items'].append(line_data)
-            elif isinstance(item, QGraphicsRectItem):
-                rect_data = {
-                    'type': 'rectangle',
-                    'color': item.pen().color().name(),
-                    'width': item.pen().widthF(),
-                    'rect': [item.rect().x(), item.rect().y(), item.rect().width(), item.rect().height()]
-                }
-                data['items'].append(rect_data)
-            elif isinstance(item, QGraphicsEllipseItem):
-                ellipse_data = {
-                    'type': 'ellipse',
-                    'color': item.pen().color().name(),
-                    'width': item.pen().widthF(),
-                    'rect': [item.rect().x(), item.rect().y(), item.rect().width(), item.rect().height()]
-                }
-                data['items'].append(ellipse_data)
+        new_item = reversed_items[-1]
+        #for item_index in range(len(new_items)):
+        item = new_item
+        if isinstance(item, QGraphicsPathItem):
+            line_data = {
+                'type': 'path',
+                'color': item.pen().color().name(),
+                'width': item.pen().widthF(),
+                'points': [(point.x(), point.y()) for subpath in item.path().toSubpathPolygons() for point in
+                           subpath]  # stores the (X,Y) coordinate of the line
+            }
+            #data['items'].append(line_data)
+            data['item'] = line_data
+        elif isinstance(item, QGraphicsRectItem):
+            rect_data = {
+                'type': 'rectangle',
+                'color': item.pen().color().name(),
+                'width': item.pen().widthF(),
+                'rect': [item.rect().x(), item.rect().y(), item.rect().width(), item.rect().height()]
+            }
+            #data['items'].append(rect_data)
+            data['item'] = rect_data
+        elif isinstance(item, QGraphicsEllipseItem):
+            ellipse_data = {
+                'type': 'ellipse',
+                'color': item.pen().color().name(),
+                'width': item.pen().widthF(),
+                'rect': [item.rect().x(), item.rect().y(), item.rect().width(), item.rect().height()]
+            }
+            #data['items'].append(ellipse_data)
+            data['item'] = ellipse_data
 
         circular_send_buffer.appendleft(data)
 
@@ -373,7 +369,6 @@ class MainWindow(QMainWindow, Ui_MainWindow):
 
     def resize_scene(self):
         rect = self.gv_Canvas.viewport().rect()
-        print(rect)
         self.scene.setSceneRect(0, 0, rect.width(), rect.height())
 
     def save_file(self):
@@ -511,12 +506,14 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             self.redo_list.append(latest_item)
             self.scene.removeItem(latest_item[0])
             signal_manager.function_call.emit(True)
+            print("function_call emitted from undo")
 
     def redo(self):
         if self.redo_list:
             item = self.redo_list.pop(-1)
             self.scene.addItem(item[0])
-            signal_manager.function_call.emit(True)
+            signal_manager.function_call.emit(False)
+            print("function_call emitted from redo")
 
     def clear_canvas(self):
         self.scene.clear()
@@ -667,8 +664,8 @@ def init_gui():
     log.show()
     app.exec()
 
-    signal_manager.function_call.connect(window.scene.track_mouse_event)
-    signal_manager.data_updated.connect(window.scene.scene_file)
+    #signal_manager.function_call.connect(window.scene.track_mouse_event)
+    #signal_manager.data_updated.connect(window.scene.scene_file)
     # signal_manager.data_ack.connect(window.scene.build_scene_file)
     signal_manager.data_ack.connect(update_data)
 
