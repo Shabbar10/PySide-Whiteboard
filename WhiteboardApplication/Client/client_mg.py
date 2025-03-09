@@ -9,10 +9,10 @@ class SignalManager(QObject):
     function_call = Signal(bool) # Call scene_file if undo/redo
     data_updated = Signal(list) # Call scene_file if new shape is drawn
     data_serialized = Signal(dict, bool) # Now send to server
+    data_ack = Signal(dict) # Data received, now build the scene
 
     send_info = Signal(str, str)
     action_signal = Signal(dict)
-    data_ack = Signal(dict)
     login_verify = Signal(bool)
 
     def update_data(self, data):

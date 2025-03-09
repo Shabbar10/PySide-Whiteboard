@@ -51,8 +51,8 @@ class MyServer(QTcpServer):
 
         print(f"Sender IP: {sender_ip}")
         for each_socket in self.client_socket:
-            if each_socket.peerAddress().toString() != sender_ip:
-                each_socket.write(data)
+            #if each_socket.peerAddress().toString() != sender_ip:
+            each_socket.write(data)
 
     def on_disconnected(self):
         socket = self.sender()

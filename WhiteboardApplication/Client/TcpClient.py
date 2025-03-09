@@ -72,8 +72,8 @@ class BoardScene(QGraphicsScene):
 
         self.serializer_worker : SceneSerializerWorker = None
         self.serializer_thread : QThread = None
-        self.builder_worker = None
-        self.builder_thread = None
+        self.builder_worker : SceneBuilderWorker = None
+        self.builder_thread : QThread = None
         self.setup_threads()
 
     def setup_threads(self):
@@ -81,10 +81,10 @@ class BoardScene(QGraphicsScene):
         self.serializer_thread = QThread()
         self.serializer_worker.moveToThread(self.serializer_thread)
         self.serializer_thread.start()
-        print("Serializer thread started")
 
-        self.builder_worker = SceneBuilderWorker()
+        self.builder_worker = SceneBuilderWorker(self)
         self.builder_thread = QThread()
+        self.builder_worker.moveToThread(self.builder_thread)
         self.builder_thread.start()
 
     def cleanup_threads(self):
@@ -195,76 +195,66 @@ class BoardScene(QGraphicsScene):
 
 
     # Receive lines, parse them, and build up the scene
-    def build_scene_file(self):
-        if len(circular_recv_buffer) > 0:
-            data = circular_recv_buffer.pop()
-            scene_file = data['scene_info']
-
-            undo_flag = data['flag']
-
-            self.drawing = True
-            prev = {'items': [],  # stores info of each line drawn
-                    'scene_rect': [],  # stores dimension of scene
-                    'color': "",  # store the color used
-                    'size': 20  # store the size of the pen
-                    }
-
-            try:
-                if 'scene_info' in data:
-                    if 'scene_rect' in scene_file:
-                        scene_rect = scene_file['scene_rect']
-                        self.setSceneRect(0, 0, scene_rect[0], scene_rect[1])
-                    else:
-                        # Provide default scene rectangle if 'scene_rect' key is missing
-                        self.setSceneRect(0, 0, 600, 500)  # Adjust the default values as needed
-                    self.change_color(QColor(scene_file['color']))
-                    self.color.setAlpha(255)
-
-                    if 'size' in scene_file.keys():
-                        self.change_size(scene_file['size'])
-                        prev = scene_file
-                    else:
-                        pass
-                    # Add lines to the scene
-                    if 'items' in scene_file:
-                        if scene_file['items'][0]['type'] == 'path':
-                            for line_data in scene_file['items']:
-                                path = QPainterPath()
-                                path.moveTo(line_data['points'][0][0], line_data['points'][0][1])
-
-                                for subpath in line_data['points'][1:]:
-                                    path.lineTo(subpath[0], subpath[1])
-
-                                pathItem = QGraphicsPathItem(path)
-                                my_pen = QPen(QColor(line_data['color']), line_data['width'])
-                                my_pen.setCapStyle(Qt.PenCapStyle.RoundCap)
-                                pathItem.setPen(my_pen)
-                                self.addItem(pathItem)
-
-                        elif scene_file['items'][0]['type'] == 'rectangle':
-                            rect_data = scene_file['items'][0]['rect']
-                            rect = QRectF(rect_data[0], rect_data[1], rect_data[2], rect_data[3])
-                            rectItem = QGraphicsRectItem(rect)
-                            my_pen = QPen(QColor(scene_file['items'][0]['color']), scene_file['items'][0]['width'])
-                            rectItem.setPen(my_pen)
-                            self.addItem(rectItem)
-
-                        elif scene_file['items'][0]['type'] == 'ellipse':
-                            ellipse_data = scene_file['items'][0]['rect']
-                            rect = QRectF(ellipse_data[0], ellipse_data[1], ellipse_data[2], ellipse_data[3])
-                            ellipseItem = QGraphicsEllipseItem(rect)
-                            my_pen = QPen(QColor(scene_file['items'][0]['color']), scene_file['items'][0]['width'])
-                            ellipseItem.setPen(my_pen)
-                            self.addItem(ellipseItem)
-            except IndexError as e:
-                print(e)
-        else:
-            pass
-
+    def build_scene_file(self, data):
+        self.builder_worker.build_scene.emit(data)
 
 class SceneBuilderWorker(QObject):
-    def __init__(self):
+    build_scene = Signal(dict)
+
+    def __init__(self, scene):
         super().__init__()
+        self.scene = scene
+        self.build_scene.connect(self.add_to_scene)
+
+    @Slot(dict)
+    def add_to_scene(self, data):
+        scene = self.scene
+        scene_file = data['scene_info']
+        try:
+            scene.change_color(QColor(scene_file['color']))
+            scene.change_size(scene_file['width'])
+
+            if scene_file['type'] == 'path':
+                print(scene_file)
+                path = QPainterPath()
+                path.moveTo(scene_file['points'][0][0], scene_file['points'][0][1])
+                for line_data in scene_file['points'][1:]:
+                    print(f"Line Data: {line_data}")
+                    path.lineTo(line_data[0], line_data[1])
+
+                pathItem = QGraphicsPathItem(path)
+                my_pen = QPen(QColor(scene_file['color']), scene_file['width'])
+                my_pen.setCapStyle(Qt.PenCapStyle.RoundCap)
+                pathItem.setPen(my_pen)
+                print(f"Adding path: {pathItem}")
+                scene.addItem(pathItem)
+
+            elif scene_file['type'] == 'rectangle':
+                rect_data = scene_file['points']
+                rect = QRectF(rect_data[0], rect_data[1], rect_data[2], rect_data[3])
+                rectItem = QGraphicsRectItem(rect)
+                my_pen = QPen(QColor(scene_file['color']), scene_file['width'])
+                rectItem.setPen(my_pen)
+                print(f"Adding rectangle: {rectItem}")
+                scene.addItem(rectItem)
+
+            elif scene_file['type'] == 'ellipse':
+                ellipse_data = scene_file['points']
+                ellipse = QRectF(ellipse_data[0], ellipse_data[1], ellipse_data[2], ellipse_data[3])
+                ellipseItem = QGraphicsEllipseItem(ellipse)
+                my_pen = QPen(QColor(scene_file['color']), scene_file['width'])
+                ellipseItem.setPen(my_pen)
+                print(f"Adding ellipse: {ellipseItem}")
+                scene.addItem(ellipseItem)
+
+            scene.update()
+            for view in scene.views():
+                view.viewport().update()
+
+        except IndexError as e:
+            print(e)
+        except Exception as e:
+            print(e)
 
 
 class SceneSerializerWorker(QObject):
@@ -272,13 +262,11 @@ class SceneSerializerWorker(QObject):
 
     def __init__(self, scene):
         super().__init__()
-        print("Inside the serializer thread")
         self.scene = scene
         self.serialize_signal.connect(self.serialize_item)
 
     @Slot(object, bool)
     def serialize_item(self, item, flag):
-        print(f"Item: {item}")
         data = {}
 
         if isinstance(item, QGraphicsPathItem):
@@ -305,14 +293,7 @@ class SceneSerializerWorker(QObject):
                 'points': [item.rect().x(), item.rect().y(), item.rect().width(), item.rect().height()]
             }
             data = ellipse_data
-        print("Data set")
         signal_manager.data_serialized.emit(data, flag)
-        print("data_serialized emitted")
-
-
-class SenderControlWorker(QObject):
-    def __init__(self):
-        super().__init__()
 
 
 class MainWindow(QMainWindow, Ui_MainWindow):
@@ -515,14 +496,12 @@ class MainWindow(QMainWindow, Ui_MainWindow):
             self.redo_list.append(latest_item)
             self.scene.removeItem(latest_item[0])
             signal_manager.function_call.emit(True)
-            print("function_call emitted from undo")
 
     def redo(self):
         if self.redo_list:
             item = self.redo_list.pop(-1)
             self.scene.addItem(item[0])
             signal_manager.function_call.emit(False)
-            print("function_call emitted from redo")
 
     def clear_canvas(self):
         self.scene.clear()
@@ -581,13 +560,6 @@ class MainWindow(QMainWindow, Ui_MainWindow):
     def closeEvent(self, event):
         self.scene.cleanup_threads()
         super().closeEvent(event)
-
-
-def update_data(data_recv: dict):
-    global circular_recv_buffer
-    global buffer_flag
-    circular_recv_buffer.appendleft(data_recv)
-    buffer_flag = 1
 
 
 class LoginWindow(QWidget):
@@ -669,8 +641,6 @@ def init_gui():
     log = LoginWindow()
     log.show()
     app.exec()
-
-    signal_manager.data_ack.connect(update_data)
 
     signal_manager.send_info.connect(validate_credentials)
     signal_manager.data_updated.connect(window.scene.scene_file)
