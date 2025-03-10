@@ -219,7 +219,6 @@ class SceneBuilderWorker(QObject):
                 path = QPainterPath()
                 path.moveTo(scene_file['points'][0][0], scene_file['points'][0][1])
                 for line_data in scene_file['points'][1:]:
-                    print(f"Line Data: {line_data}")
                     path.lineTo(line_data[0], line_data[1])
 
                 pathItem = QGraphicsPathItem(path)
@@ -276,6 +275,8 @@ class SceneSerializerWorker(QObject):
                 'width': item.pen().width(),
                 'points': [(point.x(), point.y()) for subpath in item.path().toSubpathPolygons() for point in subpath]
             }
+            reduced_points = self.reduce_points(line_data['points'])
+            line_data['points'] = reduced_points
             data = line_data
         elif isinstance(item, QGraphicsRectItem):
             rect_data = {
@@ -294,6 +295,26 @@ class SceneSerializerWorker(QObject):
             }
             data = ellipse_data
         signal_manager.data_serialized.emit(data, flag)
+
+    def reduce_points(self, points, tolerance=1.0):
+        if len(points) < 3:
+            return points
+
+        reduced = [points[0]] # Keep 1st point as is
+
+        for i in range(1, len(points) - 1):
+            prev_x, prev_y = reduced[-1]
+            curr_x, curr_y = points[i]
+            next_x, next_y = points[i + 1]
+
+            v1 = (curr_x - prev_x, curr_y - prev_y)
+            v2 = (next_x - curr_x, next_y - curr_y)
+
+            if abs(v1[0] - v2[0]) > tolerance or abs(v1[1] - v2[1]) > tolerance:
+                reduced.append((curr_x, curr_y))
+
+        reduced.append(points[-1])
+        return reduced
 
 
 class MainWindow(QMainWindow, Ui_MainWindow):

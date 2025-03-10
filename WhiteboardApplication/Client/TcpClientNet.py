@@ -43,16 +43,19 @@ class MyClient(QTcpSocket):
             'scene_info': scene_info,
             'flag': flag
         }
+        print(self.data_file)
 
         if self.state() == QAbstractSocket.SocketState.ConnectedState:
             json_dump = json.dumps(self.data_file)
-
+            print(f"JSON Dump: {json_dump}")
             block = QByteArray()
             stream = QDataStream(block, QIODevice.WriteOnly)
             stream.writeUInt32(len(json_dump))
+            print(len(json_dump))
             block.append(json_dump.encode('utf-8'))
 
             self.write(block)
+            self.flush()
             block.clear()
 
     def another_read(self):
@@ -60,14 +63,14 @@ class MyClient(QTcpSocket):
         stream = QDataStream(self)
         try:
             while self.bytesAvailable() >= 4:
-                # size = 0
-            # if read_flag:
-                size = stream.readUInt32()  # Read the size
-                # read_flag = False
-            # if self.bytesAvailable() >= size:
-                data = self.read(size)  # Read the data
-                # print(f"Received: {data}")
-                # read_flag = True
+                size_to_read = stream.readUInt32()  # Read the size
+                print(f"Size of data coming: {size_to_read}")
+                size_already_read = 0
+                if self.bytesAvailable() < size_to_read:
+                    return
+                data = self.read(size_to_read)  # Read the data
+                print(f"Data received: {data}")
+                print(f"Size of data received: {len(data)}")
 
                 json_data = json.loads(data.data().decode('utf-8'))
 
@@ -78,7 +81,7 @@ class MyClient(QTcpSocket):
 
 
 def start_client(client: MyClient):
-    client.connectToHost(QHostAddress("192.168.29.219"), 8080)
+    client.connectToHost(QHostAddress("10.20.77.115"), 8080)
     ip = get_local_ip()
     #client.connectToHost(QHostAddress(ip), 8080)
 
