@@ -298,6 +298,9 @@ class SceneSerializerWorker(QObject):
         signal_manager.data_serialized.emit(data, flag)
 
     def reduce_points(self, points, tolerance=1.0):
+        print(f"Reduce function called")
+        print(f"Reduce function points received: {points}")
+        print(f"Reduce function points received length: {len(points)}")
         if len(points) < 3:
             return points
 
@@ -315,6 +318,8 @@ class SceneSerializerWorker(QObject):
                 reduced.append((curr_x, curr_y))
 
         reduced.append(points[-1])
+        print(f"Reduce function final points: {reduced}")
+        print(f"Reduce function final points length: {len(reduced)}")
         return reduced
 
 

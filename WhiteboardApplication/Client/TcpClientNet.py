@@ -6,7 +6,7 @@ import msgpack
 
 from PySide6.QtNetwork import QHostAddress, QTcpSocket, QAbstractSocket
 
-from PySide6.QtCore import QByteArray, QDataStream, QIODevice
+from PySide6.QtCore import QByteArray, QDataStream, QIODevice, QObject, Signal, QThread
 from client_mg import SignalManager
 from WhiteboardApplication.Server.getip import get_local_ip
 
@@ -25,82 +25,100 @@ def get_ipv6_address():
     finally:
         s.close()
 
+class NetworkWorker(QObject):
+    connection_status = Signal(bool)
+    connect = Signal(str, int) # host, port
+    send_data_signal = Signal(dict, bool)
 
-class MyClient(QTcpSocket):
     def __init__(self):
         super().__init__()
-        self.connected.connect(self.ping_server)
-        self.data_file = {
-            'scene_file': {},
-            'flag': False
-        }
+        self.send_data_signal.connect(self.handle_send)
+        self.connect.connect(self.connect_to_host)
+
+    def setup_client(self):
+        self.client = QTcpSocket()
+        self.client.connected.connect(self.on_connected)
+        self.client.disconnected.connect(self.on_disconnected)
+        self.client.readyRead.connect(self.handle_read)
+
         self.receive_buffer = QByteArray()
         self.expected_size = None
 
-        self.readyRead.connect(self.another_read)
+    def connect_to_host(self, host, port):
+        self.client.connectToHost(QHostAddress(host), port)
+        if not self.client.waitForConnected(5000):
+            self.connection_status.emit(False)
 
-    def ping_server(self, scene_info, flag):
-        self.data_file = {
+    def on_connected(self):
+        print("Connected to server")
+        self.connection_status.emit(True)
+
+    def on_disconnected(self):
+        print("Disconnected from server")
+        self.connection_status.emit(False)
+
+    def handle_send(self, scene_info, flag):
+        if self.client.state() != QAbstractSocket.SocketState.ConnectedState:
+            print("Socket not connected")
+            return
+
+        data_file = {
             'scene_info': scene_info,
             'flag': flag
         }
 
-        if self.state() == QAbstractSocket.SocketState.ConnectedState:
-            json_dump = json.dumps(self.data_file)
-            print(f"Json being sent: {json_dump}")
+        try:
+            json_dump = json.dumps(data_file)
             block = QByteArray()
             stream = QDataStream(block, QIODevice.WriteOnly)
             stream.writeUInt32(len(json_dump))
             block.append(json_dump.encode('utf-8'))
-            print(f"Data block being sent: {block}")
-            self.write(block)
-            self.flush()
-            block.clear()
 
-    def another_read(self):
-        stream = QDataStream(self)
+            self.client.write(block)
+            self.client.flush()
+        except Exception as e:
+            print(e)
 
-        while self.bytesAvailable():
+    def handle_read(self):
+        stream = QDataStream(self.client)
+
+        while self.client.bytesAvailable():
             if self.expected_size is None:
-                if self.bytesAvailable() < 4:
+                if self.client.bytesAvailable() < 4:
                     return
 
                 self.expected_size = stream.readUInt32()
 
-            if self.bytesAvailable() < self.expected_size:
-                return
+            if self.client.bytesAvailable() < self.expected_size:
+                break
 
-            self.receive_buffer.append(self.read(self.expected_size))
-            print(f"Full data received: {self.receive_buffer}")
+            data = self.client.read(self.expected_size)
+            self.receive_buffer.append(data)
 
             try:
-                json_data = json.loads(self.receive_buffer.data().decode('utf-8'))
+                message_data = self.receive_buffer.data().decode('utf-8')
+                json_data = json.loads(message_data)
                 signal_manager.data_ack.emit(json_data)
             except JSONDecodeError as e:
-                print(e)
+                print(f"JSON decode error: {e}")
+            finally:
+                self.receive_buffer.clear()
+                self.expected_size = None
 
-            self.receive_buffer.clear()
-            self.expected_size = None
 
-        '''
-        try:
-            while self.bytesAvailable() >= 4:
-                size_to_read = stream.readUInt32()  # Read the size
-                print(f"Size of data coming: {size_to_read}")
-                size_already_read = 0
-                while self.bytesAvailable() < size_to_read:
-                    pass
-                data = self.read(size_to_read)  # Read the data
-                print(f"Data received: {data}")
-                print(f"Size of data received: {len(data)}")
+class MyClient(QTcpSocket):
+    def __init__(self):
+        super().__init__()
+        self.thread = QThread()
+        self.worker = NetworkWorker()
+        self.worker.moveToThread(self.thread)
+        self.thread.start()
 
-                json_data = json.loads(data.data().decode('utf-8'))
+    def connect_to_server(self, host, port):
+        self.worker.connect.emit(host, port)
 
-        except Exception as e:
-            print("Error decoding JSON:", e)
-        else:
-            signal_manager.data_ack.emit(json_data)
-        '''
+    def send_data(self, scene_info, flag):
+        self.worker.send_data_signal.emit(scene_info, flag)
 
 
 def start_client(client: MyClient):
