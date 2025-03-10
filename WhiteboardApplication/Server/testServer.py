@@ -2,7 +2,7 @@ import redis
 from PySide6.QtNetwork import QTcpServer, QTcpSocket, QHostAddress
 from getip import get_local_ip
 from netManage import SignalManager
-from PySide6.QtCore import QCoreApplication, Signal, QDataStream
+from PySide6.QtCore import QCoreApplication, Signal, QDataStream, QByteArray, QIODevice
 
 signal_manager = SignalManager()
 
@@ -43,16 +43,26 @@ class MyServer(QTcpServer):
         socket.disconnected.connect(self.on_disconnected)
 
 
-    def on_connected(self, sender):
-        sender_socket = sender
-        sender_ip = sender_socket.peerAddress().toString()
+    def on_connected(self, sender : QTcpSocket):
+        sender_ip = sender.peerAddress().toString()
+        stream = QDataStream()
+        block = QByteArray()
 
-        data = sender_socket.readAll()
+        if sender.bytesAvailable() < 4:
+            return
+        size_to_read = stream.readUInt32()
+        if sender.bytesAvailable() < size_to_read:
+            return
+        data = sender.read(size_to_read)
+
+        send_stream = QDataStream(block, QIODevice.WriteOnly)
+        send_stream.writeUInt32(size_to_read)
+        block.append(data)
 
         print(f"Sender IP: {sender_ip}")
         for each_socket in self.client_socket:
-            #if each_socket.peerAddress().toString() != sender_ip:
-            each_socket.write(data)
+            if each_socket.peerAddress().toString() != sender_ip:
+                each_socket.write(block)
 
     def on_disconnected(self):
         socket = self.sender()
