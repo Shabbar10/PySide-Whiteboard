@@ -1,5 +1,7 @@
 import json
 import socket
+from json import JSONDecodeError
+
 import msgpack
 
 from PySide6.QtNetwork import QHostAddress, QTcpSocket, QAbstractSocket
@@ -32,9 +34,8 @@ class MyClient(QTcpSocket):
             'scene_file': {},
             'flag': False
         }
-        self.sending_list = []
-        self.flag = False
-        self.read_flag = False
+        self.receive_buffer = QByteArray()
+        self.expected_size = None
 
         self.readyRead.connect(self.another_read)
 
@@ -43,15 +44,13 @@ class MyClient(QTcpSocket):
             'scene_info': scene_info,
             'flag': flag
         }
-        print(self.data_file)
+        print(f"Sending data: {self.data_file}")
 
         if self.state() == QAbstractSocket.SocketState.ConnectedState:
             json_dump = json.dumps(self.data_file)
-            print(f"JSON Dump: {json_dump}")
             block = QByteArray()
             stream = QDataStream(block, QIODevice.WriteOnly)
             stream.writeUInt32(len(json_dump))
-            print(len(json_dump))
             block.append(json_dump.encode('utf-8'))
 
             self.write(block)
@@ -59,15 +58,38 @@ class MyClient(QTcpSocket):
             block.clear()
 
     def another_read(self):
-        read_flag = True
         stream = QDataStream(self)
+
+        while self.bytesAvailable():
+            if self.expected_size is None:
+                if self.bytesAvailable() < 4:
+                    return
+
+                self.expected_size = stream.readUInt32()
+                print(f"Expected message size: {self.expected_size}")
+
+            if self.bytesAvailable() < self.expected_size:
+                return
+
+            self.receive_buffer.append(self.read(self.expected_size))
+            print(f"Full data received: {self.receive_buffer}")
+            print(f"Len of full data: {self.receive_buffer}")
+
+            try:
+                json_data = json.loads(self.receive_buffer.data().decode('utf-8'))
+                print(f"Json Data: {json_data}")
+                signal_manager.data_ack.emit(json_data)
+            except JSONDecodeError as e:
+                print(e)
+
+        '''
         try:
             while self.bytesAvailable() >= 4:
                 size_to_read = stream.readUInt32()  # Read the size
                 print(f"Size of data coming: {size_to_read}")
                 size_already_read = 0
-                if self.bytesAvailable() < size_to_read:
-                    return
+                while self.bytesAvailable() < size_to_read:
+                    pass
                 data = self.read(size_to_read)  # Read the data
                 print(f"Data received: {data}")
                 print(f"Size of data received: {len(data)}")
@@ -78,6 +100,7 @@ class MyClient(QTcpSocket):
             print("Error decoding JSON:", e)
         else:
             signal_manager.data_ack.emit(json_data)
+        '''
 
 
 def start_client(client: MyClient):
