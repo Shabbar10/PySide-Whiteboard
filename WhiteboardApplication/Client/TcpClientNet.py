@@ -44,15 +44,15 @@ class MyClient(QTcpSocket):
             'scene_info': scene_info,
             'flag': flag
         }
-        print(f"Sending data: {self.data_file}")
 
         if self.state() == QAbstractSocket.SocketState.ConnectedState:
             json_dump = json.dumps(self.data_file)
+            print(f"Json being sent: {json_dump}")
             block = QByteArray()
             stream = QDataStream(block, QIODevice.WriteOnly)
             stream.writeUInt32(len(json_dump))
             block.append(json_dump.encode('utf-8'))
-
+            print(f"Data block being sent: {block}")
             self.write(block)
             self.flush()
             block.clear()
@@ -66,21 +66,21 @@ class MyClient(QTcpSocket):
                     return
 
                 self.expected_size = stream.readUInt32()
-                print(f"Expected message size: {self.expected_size}")
 
             if self.bytesAvailable() < self.expected_size:
                 return
 
             self.receive_buffer.append(self.read(self.expected_size))
             print(f"Full data received: {self.receive_buffer}")
-            print(f"Len of full data: {self.receive_buffer}")
 
             try:
                 json_data = json.loads(self.receive_buffer.data().decode('utf-8'))
-                print(f"Json Data: {json_data}")
                 signal_manager.data_ack.emit(json_data)
             except JSONDecodeError as e:
                 print(e)
+
+            self.receive_buffer.clear()
+            self.expected_size = None
 
         '''
         try:

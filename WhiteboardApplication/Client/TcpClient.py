@@ -294,6 +294,7 @@ class SceneSerializerWorker(QObject):
                 'points': [item.rect().x(), item.rect().y(), item.rect().width(), item.rect().height()]
             }
             data = ellipse_data
+        print(f"Serialized data: {data}")
         signal_manager.data_serialized.emit(data, flag)
 
     def reduce_points(self, points, tolerance=1.0):

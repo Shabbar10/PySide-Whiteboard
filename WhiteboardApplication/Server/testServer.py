@@ -45,15 +45,16 @@ class MyServer(QTcpServer):
 
     def on_connected(self, sender : QTcpSocket):
         sender_ip = sender.peerAddress().toString()
-        stream = QDataStream()
+        stream = QDataStream(sender)
         block = QByteArray()
 
         if sender.bytesAvailable() < 4:
             return
         size_to_read = stream.readUInt32()
-        if sender.bytesAvailable() < size_to_read:
-            return
+        #if sender.bytesAvailable() < size_to_read:
+            #return
         data = sender.read(size_to_read)
+        print(f"Data received: {data}")
 
         send_stream = QDataStream(block, QIODevice.WriteOnly)
         send_stream.writeUInt32(size_to_read)
@@ -61,8 +62,8 @@ class MyServer(QTcpServer):
 
         print(f"Sender IP: {sender_ip}")
         for each_socket in self.client_socket:
-            if each_socket.peerAddress().toString() != sender_ip:
-                each_socket.write(block)
+            #if each_socket.peerAddress().toString() != sender_ip:
+            each_socket.write(block)
 
     def on_disconnected(self):
         socket = self.sender()
