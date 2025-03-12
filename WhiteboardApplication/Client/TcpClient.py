@@ -1,4 +1,6 @@
 import sys
+import cProfile, pstats
+
 
 from PySide6.QtWidgets import (
     QMainWindow,
@@ -736,4 +738,9 @@ def init_gui():
 
 
 if __name__ == '__main__':
-    init_gui()
+    with cProfile.Profile() as profile:
+        init_gui()
+
+    results = pstats.Stats(profile)
+    results.sort_stats(pstats.SortKey.TIME)
+    results.print_stats()
