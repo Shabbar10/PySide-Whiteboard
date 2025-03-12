@@ -46,8 +46,10 @@ class NetworkWorker(QObject):
 
     def connect_to_host(self, host, port):
         self.client.connectToHost(QHostAddress(host), port)
-        if not self.client.waitForConnected(5000):
-            self.connection_status.emit(False)
+        # if not self.client.waitForConnected(5000):
+        #     self.connection_status.emit(False)
+        self.client.connected.connect(lambda: self.connection_status.emit(True))
+        self.client.errorOccurred.connect(lambda _: self.connection_status.emit(False))
 
     def on_connected(self):
         print("Connected to server")
@@ -75,7 +77,7 @@ class NetworkWorker(QObject):
             block.append(json_dump.encode('utf-8'))
 
             self.client.write(block)
-            self.client.flush()
+            #self.client.flush()
         except Exception as e:
             print(e)
 
@@ -136,7 +138,11 @@ def start_client(client: MyClient):
     #client.connectToHost(QHostAddress("10.20.77.115"), 8080)
     #client.connectToHost(QHostAddress(ip), 8080)
 
-    if client.waitForConnected(8080):  # Wait for up to 5 seconds for the connection
-        print("Connected to the server")
-    else:
-        print("Connection failed. Error:", client.errorString())
+    # if client.waitForConnected(3000):  # Wait for up to 5 seconds for the connection
+    #     print("Connected to the server")
+    # else:
+    #     print("Connection failed. Error:", client.errorString())
+    client.worker.client.connected.connect(lambda: print("Connected to the server"))
+    client.worker.client.errorOccurred.connect(lambda error: print(f"Error connecting to server: {error}"))
+
+

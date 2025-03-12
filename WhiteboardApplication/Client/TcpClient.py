@@ -281,7 +281,8 @@ class SceneBuilderWorker(QObject):
                 view.update()
                 #view.repaint()
 
-            QApplication.processEvents()
+            QTimer.singleShot(0, QApplication.instance().processEvents)
+            # QApplication.processEvents()
 
         except IndexError as e:
             print(e)

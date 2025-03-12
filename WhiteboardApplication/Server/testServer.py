@@ -2,7 +2,7 @@ import redis
 from PySide6.QtNetwork import QTcpServer, QTcpSocket, QHostAddress
 from getip import get_local_ip
 from netManage import SignalManager
-from PySide6.QtCore import QCoreApplication, Signal, QDataStream, QByteArray, QIODevice
+from PySide6.QtCore import QCoreApplication, Signal, QDataStream, QByteArray, QIODevice, QThread
 
 signal_manager = SignalManager()
 
@@ -31,16 +31,19 @@ class MyServer(QTcpServer):
         socket = QTcpSocket()
         socket.setSocketDescriptor(socket_descriptor)
 
+        thread = QThread()
+        socket.moveToThread(thread)
+
+        thread.started.connect(self.handle_client)
+        thread.start()
+
+    def handle_client(self, socket : QTcpSocket):
         self.counter += 1
         username = "User" + str(self.counter)
         self.r.hset(username, 'IP', socket.peerAddress().toString())
 
-
-        self.client_socket.append(socket)
-        for each_socket in self.client_socket:
-            each_socket.readyRead.connect(lambda: self.on_connected(each_socket))
-
-        socket.disconnected.connect(self.on_disconnected)
+        socket.readyRead.connect(lambda: self.on_connected(socket))
+        socket.disconnected.connect(lambda: self.on_disconnected(socket))
 
 
     def on_connected(self, sender : QTcpSocket):
