@@ -2,8 +2,6 @@ import json
 import socket
 from json import JSONDecodeError
 
-import msgpack
-
 from PySide6.QtNetwork import QHostAddress, QTcpSocket, QAbstractSocket
 
 from PySide6.QtCore import QByteArray, QDataStream, QIODevice, QObject, Signal, QThread
@@ -34,6 +32,8 @@ class NetworkWorker(QObject):
         super().__init__()
         self.send_data_signal.connect(self.handle_send)
         self.connect.connect(self.connect_to_host)
+        self.client : QTcpSocket = None
+        self.setup_client()
 
     def setup_client(self):
         self.client = QTcpSocket()
@@ -120,17 +120,23 @@ class MyClient(QTcpSocket):
     def send_data(self, scene_info, flag):
         self.worker.send_data_signal.emit(scene_info, flag)
 
+    def cleanup_threads(self):
+        self.worker.deleteLater()
+
+        self.thread.quit()
+        self.thread.wait(3000)
+        if self.thread.isRunning():
+            self.thread.terminate()
+        self.thread.deleteLater()
+
 
 def start_client(client: MyClient):
-    client.connectToHost(QHostAddress("10.20.77.115"), 8080)
     ip = get_local_ip()
+    client.connect_to_server(ip, 8080)
+    #client.connectToHost(QHostAddress("10.20.77.115"), 8080)
     #client.connectToHost(QHostAddress(ip), 8080)
 
-    # ip = get_ipv6_address()
-    # client.connectToHost(QHostAddress("192.168.1.14"), 8080)
     if client.waitForConnected(8080):  # Wait for up to 5 seconds for the connection
         print("Connected to the server")
-        # client.readyRead.connect(client.ping_server)
-
     else:
         print("Connection failed. Error:", client.errorString())

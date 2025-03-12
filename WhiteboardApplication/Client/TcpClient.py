@@ -31,6 +31,7 @@ from PySide6.QtCore import (
     QObject,
     Signal,
     Slot,
+    QTimer,
     QRectF,
     QThread
 )
@@ -69,6 +70,11 @@ class BoardScene(QGraphicsScene):
         self.line_mode = False
         self.ellipse_mode = False
         self.rectangle_mode = False
+
+        self.last_sent_point_index = 0
+        self.send_timer = QTimer()
+        self.send_timer.setInterval(50)
+        self.send_timer.timeout.connect(self.send_path_segment)
 
         self.serializer_worker : SceneSerializerWorker = None
         self.serializer_thread : QThread = None
@@ -147,17 +153,24 @@ class BoardScene(QGraphicsScene):
                 self.addItem(self.pathItem)
             else:
                 self.drawing = True
-                self.path = QPainterPath()
                 self.previous_position = event.scenePos()
-                self.path.moveTo(self.previous_position)
-                self.pathItem = QGraphicsPathItem()
-                my_pen = QPen(self.color, self.size)
-                my_pen.setCapStyle(Qt.PenCapStyle.RoundCap)
-                self.pathItem.setPen(my_pen)
-                self.addItem(self.pathItem)
+
+                if self.pathItem is None:
+                    self.path = QPainterPath()
+                    self.path.moveTo(self.previous_position)
+                    self.pathItem = QGraphicsPathItem()
+                    my_pen = QPen(self.color, self.size)
+                    my_pen.setCapStyle(Qt.PenCapStyle.RoundCap)
+                    self.pathItem.setPen(my_pen)
+                    self.addItem(self.pathItem)
+                    self.last_sent_point_index = 0
+                    self.send_timer.start()
 
     def mouseMoveEvent(self, event):
         if self.drawing:
+            curr_position = event.scenePos()
+            #print(f"mouseMoveEvent triggered: {curr_position.x(), curr_position.y()}")
+
             if self.rectangle_mode:
                 rect = QRectF(self.start_pos, event.scenePos()).normalized()
                 self.pathItem.setRect(rect)
@@ -170,31 +183,41 @@ class BoardScene(QGraphicsScene):
                 rect = QRectF(self.start_pos, event.scenePos()).normalized()
                 self.pathItem.setRect(rect)
             else: # If freehand drawing
-                curr_position = event.scenePos()
                 self.path.lineTo(curr_position)
                 self.pathItem.setPath(self.path)
                 self.previous_position = curr_position
-                signal_manager.data_updated.emit(False) # False is for the undo flag
+
+                #print(f"Path element count: {self.path.elementCount()}")
+                #signal_manager.data_updated.emit(False)
 
     def mouseReleaseEvent(self, event):
         if event.button() == Qt.MouseButton.LeftButton:
             self.drawing = False
+            self.send_timer.stop()
+
+            self.send_path_segment(final=True)
+
             if self.line_mode or self.ellipse_mode or self.rectangle_mode:
                 signal_manager.data_updated.emit(False)
-                self.pathItem = None
-            else:
-                self.drawn_paths.append(self.path)
-                self.pathItem = None
-                signal_manager.data_updated.emit(False)
+
+            self.pathItem = None
+
+    def send_path_segment(self, final=False):
+        # If pathItem is none or there have been no new points added
+        if not self.pathItem or self.path.elementCount() <= self.last_sent_point_index:
+            return
+
+        current_count = self.path.elementCount()
+        if current_count - self.last_sent_point_index > 5 or final:
+            signal_manager.data_updated.emit(False)
+            self.last_sent_point_index = current_count
 
     def scene_file(self, flag):
-        reversed_items = self.items()[::-1]  # Only take stuff that is newly added since the last time
-        if reversed_items:
-            new_item = reversed_items[-1]
+        if self.items():
+            new_item = self.items()[0]
+            #print(f"Newest item: {new_item}")
             self.serializer_worker.serialize_signal.emit(new_item, flag)
 
-
-    # Receive lines, parse them, and build up the scene
     def build_scene_file(self, data):
         self.builder_worker.build_scene.emit(data)
 
@@ -210,23 +233,27 @@ class SceneBuilderWorker(QObject):
     def add_to_scene(self, data):
         scene = self.scene
         scene_file = data['scene_info']
+
         try:
             scene.change_color(QColor(scene_file['color']))
             scene.change_size(scene_file['width'])
 
             if scene_file['type'] == 'path':
-                print(scene_file)
-                path = QPainterPath()
-                path.moveTo(scene_file['points'][0][0], scene_file['points'][0][1])
-                for line_data in scene_file['points'][1:]:
-                    path.lineTo(line_data[0], line_data[1])
+                is_complete = scene_file.get('is_complete', True)
 
-                pathItem = QGraphicsPathItem(path)
-                my_pen = QPen(QColor(scene_file['color']), scene_file['width'])
-                my_pen.setCapStyle(Qt.PenCapStyle.RoundCap)
-                pathItem.setPen(my_pen)
-                print(f"Adding path: {pathItem}")
-                scene.addItem(pathItem)
+                path = QPainterPath()
+
+                if len(scene_file['points']) > 0:
+                    path.moveTo(scene_file['points'][0][0], scene_file['points'][0][1])
+                    for line_data in scene_file['points'][1:]:
+                        path.lineTo(line_data[0], line_data[1])
+
+                    pathItem = QGraphicsPathItem(path)
+                    my_pen = QPen(QColor(scene_file['color']), scene_file['width'])
+                    my_pen.setCapStyle(Qt.PenCapStyle.RoundCap)
+                    pathItem.setPen(my_pen)
+                    #print(f"Adding path: {pathItem}")
+                    scene.addItem(pathItem)
 
             elif scene_file['type'] == 'rectangle':
                 rect_data = scene_file['points']
@@ -234,7 +261,7 @@ class SceneBuilderWorker(QObject):
                 rectItem = QGraphicsRectItem(rect)
                 my_pen = QPen(QColor(scene_file['color']), scene_file['width'])
                 rectItem.setPen(my_pen)
-                print(f"Adding rectangle: {rectItem}")
+                #print(f"Adding rectangle: {rectItem}")
                 scene.addItem(rectItem)
 
             elif scene_file['type'] == 'ellipse':
@@ -243,12 +270,16 @@ class SceneBuilderWorker(QObject):
                 ellipseItem = QGraphicsEllipseItem(ellipse)
                 my_pen = QPen(QColor(scene_file['color']), scene_file['width'])
                 ellipseItem.setPen(my_pen)
-                print(f"Adding ellipse: {ellipseItem}")
+                # print(f"Adding ellipse: {ellipseItem}")
                 scene.addItem(ellipseItem)
 
             scene.update()
             for view in scene.views():
                 view.viewport().update()
+                view.update()
+                #view.repaint()
+
+            QApplication.processEvents()
 
         except IndexError as e:
             print(e)
@@ -269,15 +300,30 @@ class SceneSerializerWorker(QObject):
         data = {}
 
         if isinstance(item, QGraphicsPathItem):
+            path = item.path()
+            points = []
+
+            for i in range(path.elementCount()):
+                element = path.elementAt(i)
+                points.append((element.x, element.y))
+
             line_data = {
                 'type': 'path',
                 'color': item.pen().color().name(),
                 'width': item.pen().width(),
-                'points': [(point.x(), point.y()) for subpath in item.path().toSubpathPolygons() for point in subpath]
+                #'points': [(point.x(), point.y()) for subpath in item.path().toSubpathPolygons() for point in subpath]
+                'points': points,
+                'is_complete': not item.scene().drawing
             }
-            reduced_points = self.reduce_points(line_data['points'])
-            line_data['points'] = reduced_points
+
+            if not item.scene().drawing or len(points) > 100:
+                reduced_points = self.reduce_points(line_data['points'])
+                line_data['points'] = reduced_points
+            else:
+                line_data['points'] = points
+
             data = line_data
+
         elif isinstance(item, QGraphicsRectItem):
             rect_data = {
                 'type': 'rectangle',
@@ -294,13 +340,13 @@ class SceneSerializerWorker(QObject):
                 'points': [item.rect().x(), item.rect().y(), item.rect().width(), item.rect().height()]
             }
             data = ellipse_data
-        print(f"Serialized data: {data}")
+        #print(f"Serialized data: {data}")
         signal_manager.data_serialized.emit(data, flag)
 
     def reduce_points(self, points, tolerance=1.0):
-        print(f"Reduce function called")
-        print(f"Reduce function points received: {points}")
-        print(f"Reduce function points received length: {len(points)}")
+        #print(f"Reduce function called")
+        #print(f"Reduce function points received: {points}")
+        #print(f"Reduce function points received length: {len(points)}")
         if len(points) < 3:
             return points
 
@@ -318,15 +364,16 @@ class SceneSerializerWorker(QObject):
                 reduced.append((curr_x, curr_y))
 
         reduced.append(points[-1])
-        print(f"Reduce function final points: {reduced}")
-        print(f"Reduce function final points length: {len(reduced)}")
+        #print(f"Reduce function final points: {reduced}")
+        #print(f"Reduce function final points length: {len(reduced)}")
         return reduced
 
 
 class MainWindow(QMainWindow, Ui_MainWindow):
-    def __init__(self):
+    def __init__(self, client):
         super().__init__()
         self.setupUi(self)
+        self.client = client
         ############################################################################################################
         # Ensure all buttons behave properly when clicked
         self.list_of_buttons = [self.pb_Pen, self.pb_Eraser, self.pb_Line, self.pb_Ellipse, self.pb_Rectangle]
@@ -586,6 +633,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
 
     def closeEvent(self, event):
         self.scene.cleanup_threads()
+        self.client.cleanup_threads()
         super().closeEvent(event)
 
 
@@ -663,15 +711,12 @@ def validate_credentials(username: str, pwd: str):
 
 def init_gui():
     app = QApplication()
-    window = MainWindow()
 
     log = LoginWindow()
     log.show()
     app.exec()
 
     signal_manager.send_info.connect(validate_credentials)
-    signal_manager.data_updated.connect(window.scene.scene_file)
-    signal_manager.data_ack.connect(window.scene.build_scene_file)
 
     username = log.username_input.text()
     pwd = log.password_input.text()
@@ -680,7 +725,10 @@ def init_gui():
     if login_flag:
         client = MyClient()
         start_client(client)
-        signal_manager.data_serialized.connect(client.ping_server)
+        signal_manager.data_serialized.connect(client.send_data)
+        window = MainWindow(client)
+        signal_manager.data_updated.connect(window.scene.scene_file)
+        signal_manager.data_ack.connect(window.scene.build_scene_file)
         window.show()
         app.exec()
     else:
