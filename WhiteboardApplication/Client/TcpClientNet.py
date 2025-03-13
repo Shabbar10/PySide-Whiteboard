@@ -1,10 +1,26 @@
+import time
 import json
 import socket
 from json import JSONDecodeError
+import msgpack
 
-from PySide6.QtNetwork import QHostAddress, QTcpSocket, QAbstractSocket
+from PySide6.QtNetwork import (
+    QHostAddress,
+    QTcpSocket,
+    QAbstractSocket
+)
 
-from PySide6.QtCore import QByteArray, QDataStream, QIODevice, QObject, Signal, QThread
+from PySide6.QtCore import (
+    QByteArray,
+    QDataStream,
+    QIODevice,
+    QObject,
+    Signal,
+    QTimer,
+    QElapsedTimer,
+    QThread
+)
+
 from client_mg import SignalManager
 from WhiteboardApplication.Server.getip import get_local_ip
 
@@ -34,6 +50,16 @@ class NetworkWorker(QObject):
         self.connect.connect(self.connect_to_host)
         self.client : QTcpSocket = None
         self.setup_client()
+
+        self.data_batch = []
+        self.last_batch_send_time = QElapsedTimer()
+        self.last_batch_send_time.start()
+
+        self.batch_interval_ms = 200 # Send batches at a gap of 200 ms
+        self.batch_timer = QTimer()
+        self.batch_timer.setInterval(self.batch_interval_ms)
+        self.batch_timer.timeout.connect(self.send_batch)
+        self.batch_timer.start()
 
     def setup_client(self):
         self.client = QTcpSocket()
@@ -69,15 +95,34 @@ class NetworkWorker(QObject):
             'flag': flag
         }
 
+        self.data_batch.append(data_file)
+
+        if flag or len(self.data_batch) > 10:
+            self.send_batch()
+
+    def send_batch(self):
+        if not self.data_batch:
+            return
+
+        if self.client.state() != QAbstractSocket.SocketState.ConnectedState:
+            print("Socket not connected")
+            self.data_batch = []
+            return
+
         try:
-            json_dump = json.dumps(data_file)
+            packed_data = msgpack.packb({
+                'batch': self.data_batch,
+                'timestamp': time.time()
+            })
+
             block = QByteArray()
             stream = QDataStream(block, QIODevice.WriteOnly)
-            stream.writeUInt32(len(json_dump))
-            block.append(json_dump.encode('utf-8'))
+            stream.writeUInt32(len(packed_data))
+            block.append(packed_data)
 
             self.client.write(block)
-            #self.client.flush()
+            self.data_batch = []
+
         except Exception as e:
             print(e)
 

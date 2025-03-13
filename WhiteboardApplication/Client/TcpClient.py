@@ -75,9 +75,9 @@ class BoardScene(QGraphicsScene):
         self.eraser_mode = False;
 
         self.last_sent_point_index = 0
-        self.send_timer = QTimer()
-        self.send_timer.setInterval(50)
-        self.send_timer.timeout.connect(self.send_path_segment)
+        # self.send_timer = QTimer()
+        # self.send_timer.setInterval(50)
+        # self.send_timer.timeout.connect(self.send_path_segment)
 
         self.serializer_worker : SceneSerializerWorker = None
         self.serializer_thread : QThread = None
@@ -145,26 +145,23 @@ class BoardScene(QGraphicsScene):
 
     def mousePressEvent(self, event):
         if event.button() == Qt.LeftButton:
+            self.drawing = True
             if self.rectangle_mode:
-                self.drawing = True
                 self.start_pos = event.scenePos()
                 self.pathItem = QGraphicsRectItem()
                 self.pathItem.setPen(QPen(self.color, self.size))
                 self.addItem(self.pathItem)
             elif self.line_mode:
-                self.drawing = True
                 self.start_pos = event.scenePos()
                 self.pathItem = QGraphicsPathItem()
                 self.pathItem.setPen(QPen(self.color, self.size))
                 self.addItem(self.pathItem)
             elif self.ellipse_mode:
-                self.drawing = True
                 self.start_pos = event.scenePos()
                 self.pathItem = QGraphicsEllipseItem()
                 self.pathItem.setPen(QPen(self.color, self.size))
                 self.addItem(self.pathItem)
             else:
-                self.drawing = True
                 self.previous_position = event.scenePos()
 
                 if self.pathItem is None:
@@ -176,7 +173,7 @@ class BoardScene(QGraphicsScene):
                     self.pathItem.setPen(my_pen)
                     self.addItem(self.pathItem)
                     self.last_sent_point_index = 0
-                    self.send_timer.start()
+                    # self.send_timer.start()
 
     def mouseMoveEvent(self, event):
         if self.drawing:
@@ -236,7 +233,7 @@ class BoardScene(QGraphicsScene):
     def mouseReleaseEvent(self, event):
         if event.button() == Qt.MouseButton.LeftButton:
             self.drawing = False
-            self.send_timer.stop()
+            # self.send_timer.stop()
 
             self.send_path_segment(final=True)
 
@@ -364,6 +361,7 @@ class SceneSerializerWorker(QObject):
                 'is_complete': not item.scene().drawing
             }
 
+            print(f"Length of points: {len(points)}")
             if not item.scene().drawing or len(points) > 100:
                 reduced_points = self.reduce_points(line_data['points'])
                 line_data['points'] = reduced_points
@@ -392,9 +390,9 @@ class SceneSerializerWorker(QObject):
         signal_manager.data_serialized.emit(data, flag)
 
     def reduce_points(self, points, tolerance=1.0):
-        #print(f"Reduce function called")
-        #print(f"Reduce function points received: {points}")
-        #print(f"Reduce function points received length: {len(points)}")
+        print(f"Reduce function called")
+        # print(f"Reduce function points received: {points}")
+        print(f"Reduce function points received length: {len(points)}")
         if len(points) < 3:
             return points
 
@@ -413,7 +411,7 @@ class SceneSerializerWorker(QObject):
 
         reduced.append(points[-1])
         #print(f"Reduce function final points: {reduced}")
-        #print(f"Reduce function final points length: {len(reduced)}")
+        print(f"Reduce function final points length: {len(reduced)}")
         return reduced
 
 

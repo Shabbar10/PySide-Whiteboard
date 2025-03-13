@@ -1,4 +1,4 @@
-import redis
+# import redis
 from PySide6.QtNetwork import QTcpServer, QTcpSocket, QHostAddress
 from getip import get_local_ip
 from netManage import SignalManager
@@ -15,15 +15,15 @@ class MyServer(QTcpServer):
         self.clients = []
         self.client_socket = []
         self.database_signal = Signal(str, str)
-        redis_host = 'localhost'
-        redis_port = 6379
+        # redis_host = 'localhost'
+        # redis_port = 6379
 
-        self.r = redis.StrictRedis(redis_host, redis_port, decode_responses=True)
+        # self.r = redis.StrictRedis(redis_host, redis_port, decode_responses=True)
         # Set data in Redis
-        self.r.set('Atharva', 'ghanekar')
-        self.r.set('Abubakar', 'siddiq')
-        self.r.set('Shabbar', 'adamjee')
-        self.r.set('Hussain', 'ceyloni')
+        # self.r.set('Atharva', 'ghanekar')
+        # self.r.set('Abubakar', 'siddiq')
+        # self.r.set('Shabbar', 'adamjee')
+        # self.r.set('Hussain', 'ceyloni')
 
 
 
@@ -31,16 +31,22 @@ class MyServer(QTcpServer):
         socket = QTcpSocket()
         socket.setSocketDescriptor(socket_descriptor)
 
-        thread = QThread()
-        socket.moveToThread(thread)
+        # thread = QThread()
+        # socket.moveToThread(thread)
+        #
+        # thread.started.connect(self.handle_client)
+        # thread.start()
+        self.client_socket.append(socket)
+        for each_socket in self.client_socket:
+            each_socket.readyRead.connect(lambda: self.on_connected(each_socket))
 
-        thread.started.connect(self.handle_client)
-        thread.start()
+        socket.disconnected.connect(self.on_disconnected)
 
     def handle_client(self, socket : QTcpSocket):
         self.counter += 1
         username = "User" + str(self.counter)
-        self.r.hset(username, 'IP', socket.peerAddress().toString())
+        print(f"{username} connected")
+        # self.r.hset(username, 'IP', socket.peerAddress().toString())
 
         socket.readyRead.connect(lambda: self.on_connected(socket))
         socket.disconnected.connect(lambda: self.on_disconnected(socket))
@@ -54,19 +60,20 @@ class MyServer(QTcpServer):
         if sender.bytesAvailable() < 4:
             return
         size_to_read = stream.readUInt32()
+        print(f"Size: {size_to_read}")
         #if sender.bytesAvailable() < size_to_read:
             #return
         data = sender.read(size_to_read)
-        print(f"Data received: {data}")
+        # print(f"Data received: {data}")
 
         send_stream = QDataStream(block, QIODevice.WriteOnly)
         send_stream.writeUInt32(size_to_read)
         block.append(data)
 
-        print(f"Sender IP: {sender_ip}")
+        # print(f"Sender IP: {sender_ip}")
         for each_socket in self.client_socket:
-            #if each_socket.peerAddress().toString() != sender_ip:
-            each_socket.write(block)
+            if each_socket.peerAddress().toString() != sender_ip:
+                each_socket.write(block)
 
     def on_disconnected(self):
         socket = self.sender()
