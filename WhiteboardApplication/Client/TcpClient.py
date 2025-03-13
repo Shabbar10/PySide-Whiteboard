@@ -72,6 +72,7 @@ class BoardScene(QGraphicsScene):
         self.line_mode = False
         self.ellipse_mode = False
         self.rectangle_mode = False
+        self.eraser_mode = False;
 
         self.last_sent_point_index = 0
         self.send_timer = QTimer()
@@ -122,14 +123,23 @@ class BoardScene(QGraphicsScene):
         self.rectangle_mode = mode
         self.line_mode = False
         self.ellipse_mode = False
+        self.eraser_mode = False
 
     def set_line_mode(self, mode):
         self.line_mode = mode
         self.ellipse_mode = False
         self.rectangle_mode = False
+        self.eraser_mode = False
 
     def set_ellipse_mode(self, mode):
         self.ellipse_mode = mode
+        self.line_mode = False
+        self.rectangle_mode = False
+        self.eraser_mode = False
+
+    def set_eraser_mode(self, mode):
+        self.eraser_mode = mode
+        self.ellipse_mode = False
         self.line_mode = False
         self.rectangle_mode = False
 
@@ -171,7 +181,6 @@ class BoardScene(QGraphicsScene):
     def mouseMoveEvent(self, event):
         if self.drawing:
             curr_position = event.scenePos()
-            #print(f"mouseMoveEvent triggered: {curr_position.x(), curr_position.y()}")
 
             if self.rectangle_mode:
                 rect = QRectF(self.start_pos, event.scenePos()).normalized()
@@ -184,13 +193,45 @@ class BoardScene(QGraphicsScene):
             elif self.ellipse_mode:
                 rect = QRectF(self.start_pos, event.scenePos()).normalized()
                 self.pathItem.setRect(rect)
+            elif self.eraser_mode:
+                eraser_size = self.size * 5
+                eraser_rect = QRectF(
+                    curr_position.x() - eraser_size / 2,
+                    curr_position.y() - eraser_size / 2,
+                    eraser_size, eraser_size
+                )
+
+                items_to_erase = self.items(eraser_rect)
+                for item in items_to_erase:
+                    if item != self.pathItem:
+                        self.removeItem(item)
+
             else: # If freehand drawing
-                self.path.lineTo(curr_position)
+                if self.path.elementCount() > 1:
+                    control_point = self.previous_position
+                    endpoint = (curr_position + self.previous_position) / 2
+                    self.path.quadTo(control_point, endpoint)
+                else:
+                    self.path.lineTo(curr_position)
+
                 self.pathItem.setPath(self.path)
                 self.previous_position = curr_position
 
-                #print(f"Path element count: {self.path.elementCount()}")
-                #signal_manager.data_updated.emit(False)
+                if self.path.elementCount() > 30:
+                    self.finalize_current_path()
+
+                    self.path = QPainterPath()
+                    self.path.moveTo(curr_position)
+
+                    self.pathItem = QGraphicsPathItem()
+
+                    my_pen = QPen(self.color, self.size)
+                    my_pen.setCapStyle(Qt.PenCapStyle.RoundCap)
+
+                    self.pathItem.setPen(my_pen)
+                    self.addItem(self.pathItem)
+                    self.last_sent_point_index = 0
+
 
     def mouseReleaseEvent(self, event):
         if event.button() == Qt.MouseButton.LeftButton:
@@ -203,6 +244,10 @@ class BoardScene(QGraphicsScene):
                 signal_manager.data_updated.emit(False)
 
             self.pathItem = None
+
+    def finalize_current_path(self):
+        if self.pathItem and self.path.elementCount() > 1:
+            self.send_path_segment(final=True)
 
     def send_path_segment(self, final=False):
         # If pathItem is none or there have been no new points added
@@ -403,7 +448,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         ###########################################################################################################
         self.current_color = QColor("#000000")
         self.pb_Pen.clicked.connect(lambda e: self.color_changed(self.current_color))
-        self.pb_Eraser.clicked.connect(lambda e: self.color_changed(QColor("#FFFFFF")))
+        #self.pb_Eraser.clicked.connect(lambda e: self.color_changed(QColor("#FFFFFF")))
 
         self.dial.sliderMoved.connect(self.change_size)
         self.dial.setMinimum(1)
@@ -615,6 +660,9 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         for btn in self.list_of_buttons:
             if btn is not sender_button:
                 btn.setChecked(False)
+
+        if sender_button == self.pb_Eraser:
+            self.scene.set_eraser_mode(True)
 
     def toggle_line_mode(self):
         self.deselect_current_mode()
