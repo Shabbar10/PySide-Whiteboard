@@ -57,7 +57,7 @@ class BoardScene(QGraphicsScene):
 
         self.undo_flag = False
         self.data_list = []
-        self.path = None
+        self.path : QPainterPath = None
         self.mp = None
         self.previous_position = None
         self.drawing = False
@@ -215,10 +215,14 @@ class BoardScene(QGraphicsScene):
                 self.previous_position = curr_position
 
                 if self.path.elementCount() > 30:
+                    # Get the last point of the current path
+                    last_element = self.path.elementAt(self.path.elementCount() - 1)
+                    last_point = (last_element.x, last_element.y)
+
                     self.finalize_current_path()
 
                     self.path = QPainterPath()
-                    self.path.moveTo(curr_position)
+                    self.path.moveTo(last_point[0], last_point[1])
 
                     self.pathItem = QGraphicsPathItem()
 
@@ -227,6 +231,10 @@ class BoardScene(QGraphicsScene):
 
                     self.pathItem.setPen(my_pen)
                     self.addItem(self.pathItem)
+
+                    self.path.lineTo(curr_position.x(), curr_position.y())
+                    self.pathItem.setPath(self.path)
+
                     self.last_sent_point_index = 0
 
         # Expand scene if drawing near the edge
