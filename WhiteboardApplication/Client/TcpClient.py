@@ -1,4 +1,6 @@
 import sys
+from transformers import TrOCRProcessor, VisionEncoderDecoderModel
+from PIL import Image
 
 from PySide6.QtWidgets import (
     QMainWindow,
@@ -12,7 +14,8 @@ from PySide6.QtWidgets import (
     QLineEdit,
     QPushButton,
     QGraphicsEllipseItem,
-    QGraphicsRectItem
+    QGraphicsRectItem,
+    QGraphicsTextItem
 )
 
 from PySide6.QtGui import (
@@ -308,6 +311,31 @@ class BoardScene(QGraphicsScene):
         else:
             pass
 
+    def recognize_text_and_update_whiteboard(self, image_path):
+        # Load model and processor
+        processor = TrOCRProcessor.from_pretrained("microsoft/trocr-large-handwritten")
+        model = VisionEncoderDecoderModel.from_pretrained("microsoft/trocr-large-handwritten")
+
+        # Load and process image
+        image = Image.open(image_path).convert("RGB")
+        pixel_values = processor(images=image, return_tensors="pt").pixel_values
+        generated_ids = model.generate(pixel_values)
+        generated_text = processor.batch_decode(generated_ids, skip_special_tokens=True)[0]
+
+        print("Detected Text:", generated_text)  # Debugging print
+
+        # Clear existing whiteboard content
+        for item in self.scene.items():
+            self.scene.removeItem(item)
+
+        # Add recognized text to whiteboard
+        text_item = QGraphicsTextItem(generated_text)
+        text_item.setFont(QFont("Arial", 20))  # Set font and size
+        text_item.setDefaultTextColor(Qt.black)  # Set text color
+        text_item.setPos(50, 50)  # Adjust position as needed
+
+        self.scene.addItem(text_item)  # Add the text to the scene
+
 
 class MainWindow(QMainWindow, Ui_MainWindow):
     def __init__(self):
@@ -408,13 +436,17 @@ class MainWindow(QMainWindow, Ui_MainWindow):
                 # Save as PNG (captures the entire whiteboard)
                 rect = self.scene.itemsBoundingRect()  # Get bounding rectangle of all items
 
-                # Make sure the image dimensions are integers
-                image = QImage(int(rect.width()), int(rect.height()), QImage.Format_ARGB32)
-                image.fill(Qt.white)  # Set background to white
+                # Add padding to ensure no content is cut off
+                padding = 20
+                rect.adjust(-padding, -padding, padding, padding)
 
-                # Render the scene
+                # Ensure image dimensions are integers
+                image = QImage(int(rect.width()), int(rect.height()), QImage.Format_ARGB32)
+                image.fill(QColor(Qt.white))  # Set background to white
+
+                # Render the scene onto the image
                 painter = QPainter(image)
-                self.scene.render(painter, target=QRectF(0, 0, rect.width(), rect.height()), source=rect)
+                self.scene.render(painter, target=QRectF(image.rect()), source=rect)
                 painter.end()
 
                 image.save(filename, "PNG")
