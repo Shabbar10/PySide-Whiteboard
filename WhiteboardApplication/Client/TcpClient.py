@@ -288,13 +288,12 @@ class BoardScene(QGraphicsScene):
         if event.button() == Qt.MouseButton.LeftButton:
             self.drawing = False
 
+            # If user clicks in place, create a dot
             if self.pen_mode:
-                print("Mouse release, pen mode")
                 curr_pos = event.scenePos()
                 delta_x = abs(curr_pos.x() - self.start_pos.x())
                 delta_y = abs(curr_pos.y() - self.start_pos.y())
                 if delta_x <= 10 and delta_y <= 10:
-                    print("Drawing dot")
                     dot_item = QGraphicsEllipseItem()
                     dot_item.setPen(QPen(QColor(self.color), self.size))
                     dot_item.setBrush(QColor(self.color))
