@@ -23,7 +23,8 @@ from PySide6.QtGui import (
     QColor,
     QPalette,
     QLinearGradient,
-    QFont
+    QFont,
+    QImage
 )
 
 from PySide6.QtCore import (
@@ -361,43 +362,62 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.current_file = None
 
     def save_file(self):
-        filename, _ = QFileDialog.getSaveFileName(self, "Save File", "", "Whiteboard Files (*.json)")
-        if filename:
-            data = {
-                'items': [],
-                'scene_rect': [self.scene.width(), self.scene.height()],
-                'color': self.scene.color.name(),
-                'size': self.scene.size
-            }
-            for item in reversed(self.scene.items()):
-                if isinstance(item, QGraphicsPathItem):
-                    line_data = {
-                        'type': 'path',
-                        'color': item.pen().color().name(),
-                        'width': item.pen().widthF(),
-                        'points': [(point.x(), point.y()) for subpath in item.path().toSubpathPolygons() for point in
-                                   subpath]
-                    }
-                    data['items'].append(line_data)
-                elif isinstance(item, QGraphicsRectItem):
-                    rect_data = {
-                        'type': 'rectangle',
-                        'color': item.pen().color().name(),
-                        'width': item.pen().widthF(),
-                        'rect': [item.rect().x(), item.rect().y(), item.rect().width(), item.rect().height()]
-                    }
-                    data['items'].append(rect_data)
-                elif isinstance(item, QGraphicsEllipseItem):
-                    ellipse_data = {
-                        'type': 'ellipse',
-                        'color': item.pen().color().name(),
-                        'width': item.pen().widthF(),
-                        'rect': [item.rect().x(), item.rect().y(), item.rect().width(), item.rect().height()]
-                    }
-                    data['items'].append(ellipse_data)
+        options = ["JSON File (*.json)", "PNG Image (*.png)"]
+        filename, filetype = QFileDialog.getSaveFileName(self, "Save File", "", ";;".join(options))
 
-            with open(filename, 'w') as file:
-                json.dump(data, file)
+        if filename:
+            if filetype == "JSON File (*.json)":
+                # Save as JSON
+                data = {
+                    'items': [],
+                    'scene_rect': [self.scene.sceneRect().width(), self.scene.sceneRect().height()],
+                    'color': self.scene.color.name(),
+                    'size': self.scene.size
+                }
+                for item in reversed(self.scene.items()):
+                    if isinstance(item, QGraphicsPathItem):
+                        line_data = {
+                            'type': 'path',
+                            'color': item.pen().color().name(),
+                            'width': item.pen().widthF(),
+                            'points': [(point.x(), point.y()) for subpath in item.path().toSubpathPolygons() for point
+                                       in subpath]
+                        }
+                        data['items'].append(line_data)
+                    elif isinstance(item, QGraphicsRectItem):
+                        rect_data = {
+                            'type': 'rectangle',
+                            'color': item.pen().color().name(),
+                            'width': item.pen().widthF(),
+                            'rect': [item.rect().x(), item.rect().y(), item.rect().width(), item.rect().height()]
+                        }
+                        data['items'].append(rect_data)
+                    elif isinstance(item, QGraphicsEllipseItem):
+                        ellipse_data = {
+                            'type': 'ellipse',
+                            'color': item.pen().color().name(),
+                            'width': item.pen().widthF(),
+                            'rect': [item.rect().x(), item.rect().y(), item.rect().width(), item.rect().height()]
+                        }
+                        data['items'].append(ellipse_data)
+
+                with open(filename, 'w') as file:
+                    json.dump(data, file)
+
+            elif filetype == "PNG Image (*.png)":
+                # Save as PNG (captures the entire whiteboard)
+                rect = self.scene.itemsBoundingRect()  # Get bounding rectangle of all items
+
+                # Make sure the image dimensions are integers
+                image = QImage(int(rect.width()), int(rect.height()), QImage.Format_ARGB32)
+                image.fill(Qt.white)  # Set background to white
+
+                # Render the scene
+                painter = QPainter(image)
+                self.scene.render(painter, target=QRectF(0, 0, rect.width(), rect.height()), source=rect)
+                painter.end()
+
+                image.save(filename, "PNG")
 
     def load_file(self):
         filename, _ = QFileDialog.getOpenFileName(self, "Open File", "", "Whiteboard Files (*.json)")
