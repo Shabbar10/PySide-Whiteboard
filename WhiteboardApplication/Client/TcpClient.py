@@ -58,14 +58,19 @@ class BoardScene(QGraphicsScene):
         self.undo_flag = False
         self.data_list = []
         self.path : QPainterPath = None
-        self.mp = None
         self.previous_position = None
         self.drawing = False
         self.color = QColor("#000000")
-        self.size = 1
+        self.size = 5
         self.pathItem = None
         self.drawn_paths = []
         self.my_pen = None
+
+        # Since we're breaking lines into multiple items if they get to long,
+        # we need a better way to deal with undo and redo.
+        # So we group line segments of the same line into 1 'stroke group'
+        self.stroke_groups = []
+        self.current_stroke_group = []
 
         self.current_tool = None
         self.line_mode = False
@@ -146,21 +151,26 @@ class BoardScene(QGraphicsScene):
     def mousePressEvent(self, event):
         if event.button() == Qt.LeftButton:
             self.drawing = True
+            self.current_stroke_group = []
+
             if self.rectangle_mode:
                 self.start_pos = event.scenePos()
                 self.pathItem = QGraphicsRectItem()
                 self.pathItem.setPen(QPen(self.color, self.size))
                 self.addItem(self.pathItem)
+                self.current_stroke_group.append(self.pathItem)
             elif self.line_mode:
                 self.start_pos = event.scenePos()
                 self.pathItem = QGraphicsPathItem()
                 self.pathItem.setPen(QPen(self.color, self.size))
                 self.addItem(self.pathItem)
+                self.current_stroke_group.append(self.pathItem)
             elif self.ellipse_mode:
                 self.start_pos = event.scenePos()
                 self.pathItem = QGraphicsEllipseItem()
                 self.pathItem.setPen(QPen(self.color, self.size))
                 self.addItem(self.pathItem)
+                self.current_stroke_group.append(self.pathItem)
             else:
                 self.previous_position = event.scenePos()
 
@@ -172,6 +182,7 @@ class BoardScene(QGraphicsScene):
                     my_pen.setCapStyle(Qt.PenCapStyle.RoundCap)
                     self.pathItem.setPen(my_pen)
                     self.addItem(self.pathItem)
+                    self.current_stroke_group.append(self.pathItem)
                     self.last_sent_point_index = 0
                     # self.send_timer.start()
 
@@ -232,6 +243,8 @@ class BoardScene(QGraphicsScene):
                     self.pathItem.setPen(my_pen)
                     self.addItem(self.pathItem)
 
+                    self.current_stroke_group.append(self.pathItem)
+
                     self.path.lineTo(curr_position.x(), curr_position.y())
                     self.pathItem.setPath(self.path)
 
@@ -254,19 +267,17 @@ class BoardScene(QGraphicsScene):
             self.setSceneRect(current_rect.adjusted(0, -500, 0, 0))
             print("expand up")
 
-
-
-
     def mouseReleaseEvent(self, event):
         if event.button() == Qt.MouseButton.LeftButton:
-
             self.drawing = False
-            # self.send_timer.stop()
-
             self.send_path_segment(final=True)
 
             if self.line_mode or self.ellipse_mode or self.rectangle_mode:
                 signal_manager.data_updated.emit(False)
+
+            if self.current_stroke_group:
+                self.stroke_groups.append(self.current_stroke_group)
+                self.current_stroke_group = []
 
             self.pathItem = None
         super().mouseReleaseEvent(event)
@@ -651,17 +662,28 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.scene.change_size(self.dial.value())
 
     def undo(self):
+        if self.scene.stroke_groups:
+            latest_group = self.scene.stroke_groups.pop()
+            self.redo_list.append(latest_group)
+
+            for item in latest_group:
+                self.scene.removeItem(item)
+
+        '''
         if self.scene.items():
             latest_item = self.scene.items()
             self.redo_list.append(latest_item)
             self.scene.removeItem(latest_item[0])
             signal_manager.function_call.emit(True)
+        '''
 
     def redo(self):
         if self.redo_list:
-            item = self.redo_list.pop(-1)
-            self.scene.addItem(item[0])
-            signal_manager.function_call.emit(False)
+            group = self.redo_list.pop()
+            for item in group:
+                self.scene.addItem(item)
+                self.scene.stroke_groups.append(group)
+
 
     def clear_canvas(self):
         self.scene.clear()
