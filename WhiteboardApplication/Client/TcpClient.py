@@ -14,7 +14,7 @@ from PySide6.QtWidgets import (
     QLineEdit,
     QPushButton,
     QGraphicsEllipseItem,
-    QGraphicsRectItem
+    QGraphicsRectItem,
 )
 
 from PySide6.QtGui import (
@@ -35,7 +35,7 @@ from PySide6.QtCore import (
     Slot,
     QTimer,
     QRectF,
-    QThread
+    QThread,
 )
 import json
 from TcpClientNet import start_client, MyClient, signal_manager
@@ -54,7 +54,6 @@ validation_dict = {'Atharva': 'ghanekar', 'Abubakar': 'siddiq', 'Shabbar': 'adam
 class BoardScene(QGraphicsScene):
     def __init__(self):
         super().__init__()
-        self.setSceneRect(0, 0, 600, 500)
 
         self.undo_flag = False
         self.data_list = []
@@ -84,6 +83,7 @@ class BoardScene(QGraphicsScene):
         self.builder_worker : SceneBuilderWorker = None
         self.builder_thread : QThread = None
         self.setup_threads()
+
 
     def setup_threads(self):
         self.serializer_worker = SceneSerializerWorker(self)
@@ -229,9 +229,29 @@ class BoardScene(QGraphicsScene):
                     self.addItem(self.pathItem)
                     self.last_sent_point_index = 0
 
+        # Expand scene if drawing near the edge
+        buffer = 50
+        current_rect = self.sceneRect()
+
+        if event.scenePos().x() > current_rect.right() - buffer:
+            self.setSceneRect(current_rect.adjusted(0, 0, 500, 0))
+            print("expand right")
+        if event.scenePos().y() > current_rect.bottom() - buffer:
+            self.setSceneRect(current_rect.adjusted(0, 0, 0, 500))
+            print("expand down")
+        if event.scenePos().x() < current_rect.left() + buffer:
+            self.setSceneRect(current_rect.adjusted(-500, 0, 0, 0))
+            print("expand left")
+        if event.scenePos().y() < current_rect.top() + buffer:
+            self.setSceneRect(current_rect.adjusted(0, -500, 0, 0))
+            print("expand up")
+
+
+
 
     def mouseReleaseEvent(self, event):
         if event.button() == Qt.MouseButton.LeftButton:
+
             self.drawing = False
             # self.send_timer.stop()
 
@@ -241,6 +261,7 @@ class BoardScene(QGraphicsScene):
                 signal_manager.data_updated.emit(False)
 
             self.pathItem = None
+        super().mouseReleaseEvent(event)
 
     def finalize_current_path(self):
         if self.pathItem and self.path.elementCount() > 1:
@@ -468,6 +489,17 @@ class MainWindow(QMainWindow, Ui_MainWindow):
 
         self.redo_list = []
         self.current_file = None
+
+    def wheelEvent(self, event):
+        scroll_delta = event.angleDelta().y()  # Detect scroll direction
+        current_rect = self.scene.sceneRect()
+
+        if scroll_delta > 0:  # Scrolling up
+            self.scene.setSceneRect(current_rect.adjusted(-500, -500, 500, 500))  # Expand in all directions
+        elif scroll_delta < 0:  # Scrolling down
+            self.scene.setSceneRect(current_rect.adjusted(-500, -500, 500, 500))  # Expand in all directions
+
+        super().wheelEvent(event)
 
     def showEvent(self, event, /):
         self.resize_scene()
