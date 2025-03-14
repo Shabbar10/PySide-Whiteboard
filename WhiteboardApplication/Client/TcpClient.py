@@ -293,7 +293,7 @@ class BoardScene(QGraphicsScene):
                 curr_pos = event.scenePos()
                 delta_x = abs(curr_pos.x() - self.start_pos.x())
                 delta_y = abs(curr_pos.y() - self.start_pos.y())
-                if delta_x <= 10 and delta_y <= 10:
+                if delta_x == 0 and delta_y == 0:
                     dot_item = QGraphicsEllipseItem()
                     dot_item.setPen(QPen(QColor(self.color), self.size))
                     dot_item.setBrush(QColor(self.color))
@@ -532,6 +532,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.pb_Color.clicked.connect(self.color_dialog)
         self.pb_Undo.clicked.connect(self.undo)
         self.pb_Redo.clicked.connect(self.redo)
+        self.pb_Pen.clicked.connect(self.toggle_pen_mode)
         self.pb_Line.clicked.connect(self.toggle_line_mode)
         self.pb_Ellipse.clicked.connect(self.toggle_ellipse_mode)
         self.pb_Rectangle.clicked.connect(self.toggle_rectangle_mode)
@@ -750,6 +751,12 @@ class MainWindow(QMainWindow, Ui_MainWindow):
 
         if sender_button == self.pb_Eraser:
             self.scene.set_eraser_mode(True)
+
+    def toggle_pen_mode(self):
+        self.deselect_current_mode()
+        self.scene.set_pen_mode(True)
+        self.pb_Pen.setChecked(True)
+        self.scene.set_tool("Pen")
 
     def toggle_line_mode(self):
         self.deselect_current_mode()
