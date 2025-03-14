@@ -388,6 +388,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
 
         self.redo_list = []
         self.current_file = None
+        self.pb_HW2T.clicked.connect(self.scene.recognize_text_and_update_whiteboard)
 
     def save_file(self):
         options = ["JSON File (*.json)", "PNG Image (*.png)"]
