@@ -66,6 +66,7 @@ class BoardScene(QGraphicsScene):
         self.drawn_paths = []
         self.my_pen = None
         self.start_pos = None
+        self.fill_shape : bool = False
 
         # Since we're breaking lines into multiple items if they get to long,
         # we need a better way to deal with undo and redo.
@@ -73,7 +74,6 @@ class BoardScene(QGraphicsScene):
         self.stroke_groups = []
         self.current_stroke_group = []
 
-        self.current_tool = None
         self.pen_mode = True
         self.line_mode = False
         self.ellipse_mode = False
@@ -123,9 +123,6 @@ class BoardScene(QGraphicsScene):
     def change_size(self, size):
         self.size = size
 
-    def set_tool(self, tool):
-        self.current_tool = tool
-
     def set_pen_mode(self, mode):
         self.pen_mode = mode
         self.rectangle_mode = False
@@ -161,9 +158,11 @@ class BoardScene(QGraphicsScene):
         self.line_mode = False
         self.rectangle_mode = False
 
+    def toggle_fill_color(self):
+        self.fill_shape = not self.fill_shape
+
     def mousePressEvent(self, event):
         if event.button() == Qt.LeftButton:
-            print("Mouse clicked")
             self.drawing = True
             self.current_stroke_group = []
 
@@ -171,6 +170,8 @@ class BoardScene(QGraphicsScene):
                 self.start_pos = event.scenePos()
                 self.pathItem = QGraphicsRectItem()
                 self.pathItem.setPen(QPen(self.color, self.size))
+                if self.fill_shape:
+                    self.pathItem.setBrush(self.color)
                 self.addItem(self.pathItem)
                 self.current_stroke_group.append(self.pathItem)
             elif self.line_mode:
@@ -183,6 +184,8 @@ class BoardScene(QGraphicsScene):
                 self.start_pos = event.scenePos()
                 self.pathItem = QGraphicsEllipseItem()
                 self.pathItem.setPen(QPen(self.color, self.size))
+                if self.fill_shape:
+                    self.pathItem.setBrush(self.color)
                 self.addItem(self.pathItem)
                 self.current_stroke_group.append(self.pathItem)
             else:
@@ -199,7 +202,8 @@ class BoardScene(QGraphicsScene):
                     self.addItem(self.pathItem)
                     self.current_stroke_group.append(self.pathItem)
                     self.last_sent_point_index = 0
-                    # self.send_timer.start()
+
+        super().mousePressEvent(event)
 
     def mouseMoveEvent(self, event):
         if self.drawing:
@@ -214,8 +218,6 @@ class BoardScene(QGraphicsScene):
                 path.lineTo(event.scenePos())
                 self.pathItem.setPath(path)
             elif self.ellipse_mode:
-                print(f"Start pos = {self.start_pos}")
-                print(f"Event pos = {event.scenePos()}")
                 rect = QRectF(self.start_pos, event.scenePos()).normalized()
                 self.pathItem.setRect(rect)
             elif self.eraser_mode:
@@ -284,6 +286,8 @@ class BoardScene(QGraphicsScene):
             self.setSceneRect(current_rect.adjusted(0, -500, 0, 0))
             print("expand up")
 
+        super().mouseMoveEvent(event)
+
     def mouseReleaseEvent(self, event):
         if event.button() == Qt.MouseButton.LeftButton:
             self.drawing = False
@@ -304,7 +308,6 @@ class BoardScene(QGraphicsScene):
                     dot_rect = QRectF(x, y, size, size)
                     dot_item.setRect(dot_rect)
                     self.addItem(dot_item)
-
 
             if self.line_mode or self.ellipse_mode or self.rectangle_mode:
                 signal_manager.data_updated.emit(False)
@@ -495,6 +498,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
     def __init__(self, client):
         super().__init__()
         self.setupUi(self)
+        self.setWindowTitle("SynqBoard")
         self.client = client
         ############################################################################################################
         # Ensure all buttons behave properly when clicked
@@ -506,6 +510,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.pb_Line.clicked.connect(self.button_clicked)
         self.pb_Ellipse.clicked.connect(self.button_clicked)
         self.pb_Rectangle.clicked.connect(self.button_clicked)
+
 
         self.current_color = QColor("#000000")
 
@@ -542,6 +547,8 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.gv_Canvas.setScene(self.scene)
         self.gv_Canvas.setRenderHint(QPainter.RenderHint.Antialiasing, True)
         self.resize_scene()
+
+        self.cb_Fill_Color.stateChanged.connect(self.scene.toggle_fill_color)
 
         self.redo_list = []
         self.current_file = None
@@ -756,25 +763,21 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.deselect_current_mode()
         self.scene.set_pen_mode(True)
         self.pb_Pen.setChecked(True)
-        self.scene.set_tool("Pen")
 
     def toggle_line_mode(self):
         self.deselect_current_mode()
         self.scene.set_line_mode(True)
         self.pb_Line.setChecked(True)
-        self.scene.set_tool("Line")
 
     def toggle_ellipse_mode(self):
         self.deselect_current_mode()
         self.scene.set_ellipse_mode(True)
         self.pb_Ellipse.setChecked(True)
-        self.scene.set_tool("Ellipse")
 
     def toggle_rectangle_mode(self):
         self.deselect_current_mode()
         self.scene.set_rectangle_mode(True)
         self.pb_Rectangle.setChecked(True)
-        self.scene.set_tool("Rectangle")
 
     def closeEvent(self, event):
         self.scene.cleanup_threads()
