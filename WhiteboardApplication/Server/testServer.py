@@ -3,8 +3,63 @@ from PySide6.QtNetwork import QTcpServer, QTcpSocket, QHostAddress
 from getip import get_local_ip
 from netManage import SignalManager
 from PySide6.QtCore import QCoreApplication, Signal, QDataStream, QByteArray, QIODevice, QThread
+import socket
+import pyaudio
+import threading
 
 signal_manager = SignalManager()
+
+import socket
+import pyaudio
+import threading
+
+class VoiceServer:
+    def __init__(self, port=5000):
+        self.FORMAT = pyaudio.paInt16
+        self.CHANNELS = 1
+        self.RATE = 44100
+        self.CHUNK = 1024
+        self.audio = pyaudio.PyAudio()
+        self.stream = self.audio.open(format=self.FORMAT, channels=self.CHANNELS, rate=self.RATE, output=True, frames_per_buffer=self.CHUNK)
+
+        self.server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self.server_socket.bind(("0.0.0.0", port))
+        self.server_socket.listen(5)
+        self.clients = []
+
+    def handle_client(self, client_socket):
+        """Handles incoming voice data from a client."""
+        while True:
+            try:
+                data = client_socket.recv(self.CHUNK)
+                if not data:
+                    break
+                print(f"[SERVER] Received voice input from {client_socket.getpeername()}")
+
+                # Broadcast to other clients
+                for client in self.clients:
+                    if client != client_socket:
+                        try:
+                            client.sendall(data)
+                            print(f"[SERVER] Forwarded voice to {client.getpeername()}")
+                        except:
+                            print(f"[WARNING] Failed to send to {client.getpeername()}, removing from list")
+                            self.clients.remove(client)
+
+            except Exception as e:
+                print(f"[SERVER] Client Disconnected: {e}")
+                break
+
+        if client_socket in self.clients:
+            self.clients.remove(client_socket)
+        client_socket.close()
+
+    def accept_clients(self):
+        print("Voice server started on port 5000")
+        while True:
+            client_socket, _ = self.server_socket.accept()
+            self.clients.append(client_socket)
+            threading.Thread(target=self.handle_client, args=(client_socket,), daemon=True).start()
 
 
 class MyServer(QTcpServer):
@@ -97,6 +152,9 @@ def start_server(server: MyServer):
 if __name__ == "__main__":
     app = QCoreApplication([])
     local_server = MyServer()
+
+    voice_server = VoiceServer()  # Initialize voice chat server
+    threading.Thread(target=voice_server.accept_clients, daemon=True).start()
 
     start_server(local_server)
     app.exec()
