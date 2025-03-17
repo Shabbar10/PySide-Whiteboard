@@ -15,6 +15,7 @@ from PySide6.QtWidgets import (
     QPushButton,
     QGraphicsEllipseItem,
     QGraphicsRectItem,
+    QGraphicsView,
 )
 
 from PySide6.QtGui import (
@@ -25,7 +26,8 @@ from PySide6.QtGui import (
     QColor,
     QPalette,
     QLinearGradient,
-    QFont
+    QFont,
+    QMouseEvent,
 )
 
 from PySide6.QtCore import (
@@ -36,6 +38,8 @@ from PySide6.QtCore import (
     QTimer,
     QRectF,
     QThread,
+    QPointF,
+    QEvent,
 )
 import json
 from TcpClientNet import start_client, MyClient, signal_manager
@@ -162,7 +166,7 @@ class BoardScene(QGraphicsScene):
         self.fill_shape = not self.fill_shape
 
     def mousePressEvent(self, event):
-        if event.button() == Qt.LeftButton:
+        if event.button() == Qt.MouseButton.LeftButton:
             self.drawing = True
             self.current_stroke_group = []
 
@@ -203,7 +207,7 @@ class BoardScene(QGraphicsScene):
                     self.current_stroke_group.append(self.pathItem)
                     self.last_sent_point_index = 0
 
-        super().mousePressEvent(event)
+        #super().mousePressEvent(event)
 
     def mouseMoveEvent(self, event):
         if self.drawing:
@@ -286,7 +290,7 @@ class BoardScene(QGraphicsScene):
             self.setSceneRect(current_rect.adjusted(0, -500, 0, 0))
             print("expand up")
 
-        super().mouseMoveEvent(event)
+        #super().mouseMoveEvent(event)
 
     def mouseReleaseEvent(self, event):
         if event.button() == Qt.MouseButton.LeftButton:
@@ -319,7 +323,7 @@ class BoardScene(QGraphicsScene):
                 self.current_stroke_group = []
 
             self.pathItem = None
-        super().mouseReleaseEvent(event)
+        #super().mouseReleaseEvent(event)
 
     def finalize_current_path(self):
         if self.pathItem and self.path.elementCount() > 1:
@@ -343,6 +347,7 @@ class BoardScene(QGraphicsScene):
 
     def build_scene_file(self, data):
         self.builder_worker.build_scene.emit(data)
+
 
 class SceneBuilderWorker(QObject):
     build_scene = Signal(dict)
@@ -494,6 +499,62 @@ class SceneSerializerWorker(QObject):
         return reduced
 
 
+class PanningGraphicsView(QGraphicsView):
+    def __init__(self, parent=None):
+        super().__init__()
+
+        self.setRenderHint(QPainter.RenderHint.Antialiasing, True)
+        self.setDragMode(QGraphicsView.DragMode.NoDrag)
+        self.setBackgroundBrush(QColor("white"))
+        self.setTransformationAnchor(QGraphicsView.ViewportAnchor.AnchorUnderMouse)
+        self.setViewportUpdateMode(QGraphicsView.FullViewportUpdate)
+        self.panning = False
+        self.last_pos = QPointF()
+
+        # Disable scrollbars
+        self.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        self.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+
+    def mousePressEvent(self, event):
+        if event.button() == Qt.MouseButton.MiddleButton:
+            self.panning = True
+            self.last_pos = event.pos()
+            self.setCursor(Qt.CursorShape.ClosedHandCursor)
+            event.accept()
+        else:
+            super().mousePressEvent(event)
+
+    def mouseMoveEvent(self, event):
+        if self.panning:
+            delta = self.mapToScene(event.pos()) - self.mapToScene(self.last_pos)
+            self.last_pos = event.pos()
+
+            # Move the scene by the delta amount
+            self.setSceneRect(self.sceneRect().translated(-delta.x(), -delta.y()))
+            event.accept()
+        else:
+            super().mouseMoveEvent(event)
+
+    def mouseReleaseEvent(self, event):
+        if event.button() == Qt.MouseButton.MiddleButton:
+            self.panning = False
+            self.setCursor(Qt.CursorShape.ArrowCursor)
+            event.accept()
+        else:
+            super().mouseReleaseEvent(event)
+
+    def wheelEvent(self, event, /):
+        scroll_delta = event.angleDelta()
+        if event.modifiers() & Qt.KeyboardModifier.ControlModifier:
+            zoom_factor = 1.1 if scroll_delta.y() > 0 else 0.9
+            self.scale(zoom_factor, zoom_factor)
+        else:
+            if scroll_delta.y() != 0 or scroll_delta.x() != 0:
+                pan_y = -scroll_delta.y() * 0.5
+                pan_x = -scroll_delta.x() * 0.5
+                self.setSceneRect(self.sceneRect().translated(pan_x, pan_y))
+
+
 class MainWindow(QMainWindow, Ui_MainWindow):
     def __init__(self, client):
         super().__init__()
@@ -543,6 +604,12 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.pb_Rectangle.clicked.connect(self.toggle_rectangle_mode)
         ###########################################################################################################
 
+        old_view = self.gv_Canvas
+        self.gv_Canvas = PanningGraphicsView(self.centralwidget)
+        self.gv_Canvas.setObjectName("gv_Canvas")
+        self.gridLayout.replaceWidget(old_view, self.gv_Canvas)
+        old_view.deleteLater()
+
         self.scene = BoardScene()
         self.gv_Canvas.setScene(self.scene)
         self.gv_Canvas.setRenderHint(QPainter.RenderHint.Antialiasing, True)
@@ -562,7 +629,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         elif scroll_delta < 0:  # Scrolling down
             self.scene.setSceneRect(current_rect.adjusted(-500, -500, 500, 500))  # Expand in all directions
 
-        super().wheelEvent(event)
+        #super().wheelEvent(event)
 
     def showEvent(self, event, /):
         self.resize_scene()
