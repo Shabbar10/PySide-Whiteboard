@@ -275,23 +275,6 @@ class BoardScene(QGraphicsScene):
 
                     self.last_sent_point_index = 0
 
-        # Expand scene if drawing near the edge
-        buffer = 50
-        current_rect = self.sceneRect()
-
-        if event.scenePos().x() > current_rect.right() - buffer:
-            self.setSceneRect(current_rect.adjusted(0, 0, 500, 0))
-            print("expand right")
-        if event.scenePos().y() > current_rect.bottom() - buffer:
-            self.setSceneRect(current_rect.adjusted(0, 0, 0, 500))
-            print("expand down")
-        if event.scenePos().x() < current_rect.left() + buffer:
-            self.setSceneRect(current_rect.adjusted(-500, 0, 0, 0))
-            print("expand left")
-        if event.scenePos().y() < current_rect.top() + buffer:
-            self.setSceneRect(current_rect.adjusted(0, -500, 0, 0))
-            print("expand up")
-
         #super().mouseMoveEvent(event)
 
     def mouseReleaseEvent(self, event):

@@ -202,6 +202,7 @@ class MyClient(QTcpSocket):
 
 def start_client(client: MyClient):
     ip = get_local_ip()
+    # ip = get_ipv6_address()
     client.connect_to_server(ip, 8080)
     #client.connectToHost(QHostAddress("10.20.77.115"), 8080)
     #client.connectToHost(QHostAddress(ip), 8080)
