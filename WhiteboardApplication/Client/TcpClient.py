@@ -1,4 +1,4 @@
-import sys
+import sys, os, re
 from transformers import TrOCRProcessor, VisionEncoderDecoderModel
 from PIL import Image
 
@@ -163,7 +163,17 @@ class BoardScene(QGraphicsScene):
     def mouseReleaseEvent(self, event):
         if event.button() == Qt.MouseButton.LeftButton:
             self.drawing = False
-            if self.line_mode or self.ellipse_mode or self.rectangle_mode:
+            if self.rectangle_mode:
+                # Store rectangle coordinates
+                rect = self.pathItem.rect()
+                self.drawn_paths.append({
+                    "type": "rectangle",
+                    "rect": [rect.x(), rect.y(), rect.width(), rect.height()]
+                })
+                print("Stored rectangle:", self.drawn_paths[-1])  # Debugging
+                self.pathItem = None
+                signal_manager.data_updated.emit(False)
+            elif self.line_mode or self.ellipse_mode:
                 signal_manager.data_updated.emit(False)
                 self.pathItem = None
             else:
@@ -311,32 +321,6 @@ class BoardScene(QGraphicsScene):
         else:
             pass
 
-    def recognize_text_and_update_whiteboard(self, image_path):
-        # Load model and processor
-        processor = TrOCRProcessor.from_pretrained("microsoft/trocr-large-handwritten")
-        model = VisionEncoderDecoderModel.from_pretrained("microsoft/trocr-large-handwritten")
-
-        # Load and process image
-        image = Image.open(image_path).convert("RGB")
-        pixel_values = processor(images=image, return_tensors="pt").pixel_values
-        generated_ids = model.generate(pixel_values)
-        generated_text = processor.batch_decode(generated_ids, skip_special_tokens=True)[0]
-
-        print("Detected Text:", generated_text)  # Debugging print
-
-        # Clear existing whiteboard content
-        for item in self.scene.items():
-            self.scene.removeItem(item)
-
-        # Add recognized text to whiteboard
-        text_item = QGraphicsTextItem(generated_text)
-        text_item.setFont(QFont("Arial", 20))  # Set font and size
-        text_item.setDefaultTextColor(Qt.black)  # Set text color
-        text_item.setPos(50, 50)  # Adjust position as needed
-
-        self.scene.addItem(text_item)  # Add the text to the scene
-
-
 class MainWindow(QMainWindow, Ui_MainWindow):
     def __init__(self):
         super().__init__()
@@ -380,6 +364,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.pb_Line.clicked.connect(self.toggle_line_mode)
         self.pb_Ellipse.clicked.connect(self.toggle_ellipse_mode)
         self.pb_Rectangle.clicked.connect(self.toggle_rectangle_mode)
+        self.pb_HW2T.clicked.connect(self.draw_box)
         ###########################################################################################################
 
         self.scene = BoardScene()
@@ -388,7 +373,84 @@ class MainWindow(QMainWindow, Ui_MainWindow):
 
         self.redo_list = []
         self.current_file = None
-        self.pb_HW2T.clicked.connect(self.scene.recognize_text_and_update_whiteboard)
+
+    def save_png(self):
+        file_path = os.path.join(r"C:\Users\hussa\PycharmProjects\PySide-Whiteboard\WhiteboardApplication\save_image",
+                                 "Image_PNG.png")
+
+        # Ensure there is a rectangle to use as a bounding box
+        if not self.scene.drawn_paths or self.scene.drawn_paths[-1]["type"] != "rectangle":
+            print("No rectangle drawn to define the image area.")
+            return  # Exit if no rectangle is available
+
+        # getting rectangle's coordinates
+        rect_data = self.scene.drawn_paths[-1]["rect"]
+        bounding_rect = QRectF(rect_data[0], rect_data[1], rect_data[2], rect_data[3])
+
+        # padding to capture complete image
+        padding = 10
+        bounding_rect.adjust(-padding, -padding, padding, padding)
+
+        image = QImage(int(bounding_rect.width()), int(bounding_rect.height()), QImage.Format_ARGB32)
+        image.fill(Qt.white)  # Set background to white
+
+        # Render only the last drawn rectangle's area
+        painter = QPainter(image)
+        self.scene.render(painter, target=QRectF(image.rect()), source=bounding_rect)
+        painter.end()
+
+        image.save(file_path, "PNG")
+
+    def draw_box(self):
+        # function to change mode to rectangle to recognize text
+        self.toggle_rectangle_mode()
+        QTimer.singleShot(2000, self.recognize_text_and_update_whiteboard)
+
+
+    def recognize_text_and_update_whiteboard(self):
+        self.save_png()
+        image_path = r"C:\Users\hussa\PycharmProjects\PySide-Whiteboard\WhiteboardApplication\save_image\Image_PNG.png"
+        processor = TrOCRProcessor.from_pretrained("microsoft/trocr-large-handwritten", use_fast = True)
+        model = VisionEncoderDecoderModel.from_pretrained("microsoft/trocr-large-handwritten")
+
+        # Loading Image
+        image = Image.open(image_path).convert("RGB")
+        pixel_values = processor(images=image, return_tensors="pt").pixel_values
+        generated_ids = model.generate(pixel_values)
+        generated_text = processor.batch_decode(generated_ids, skip_special_tokens=True)[0]
+
+        print("Detected Text:", generated_text)  # Debugging print
+        cleaned_text = re.sub(r"[ !.?#]", "", generated_text) # to remove unwanted symbols
+        # clearing the whiteboard
+        last_rectangle = None
+        last_freehand_path = None
+
+        for item in reversed(self.scene.items()):
+            if isinstance(item, QGraphicsRectItem) and last_rectangle is None:
+                last_rectangle = item
+            elif isinstance(item, QGraphicsPathItem) and last_freehand_path is None:
+                last_freehand_path = item
+                self.scene.removeItem(last_freehand_path)
+                last_freehand_path = None
+
+        if last_rectangle:
+            self.scene.removeItem(last_rectangle)
+
+        # Finding the most recent rectangle to place the text
+        if self.scene.drawn_paths and self.scene.drawn_paths[-1]["type"] == "rectangle":
+            rect = self.scene.drawn_paths[-1]["rect"]  # Get last drawn rectangle
+
+            # Add recognized text inside the rectangle
+            text_item = QGraphicsTextItem(cleaned_text)
+            text_item.setFont(QFont("Arial", 20))
+            text_item.setDefaultTextColor(Qt.black)
+
+            text_item.setPos(rect[0] + 10, rect[1] + 10)  # Slight padding
+
+            self.scene.addItem(text_item)
+            self.deselect_current_mode()
+            self.pb_Pen.setChecked(True)
+
 
     def save_file(self):
         options = ["JSON File (*.json)", "PNG Image (*.png)"]
@@ -451,6 +513,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
                 painter.end()
 
                 image.save(filename, "PNG")
+
 
     def load_file(self):
         filename, _ = QFileDialog.getOpenFileName(self, "Open File", "", "Whiteboard Files (*.json)")
