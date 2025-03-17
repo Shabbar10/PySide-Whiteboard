@@ -39,6 +39,8 @@ import json
 from TcpClientNet import start_client, MyClient, signal_manager
 from WhiteboardApplication.UI.board import Ui_MainWindow
 from collections import deque
+from VoiceClient import VoiceClient
+
 
 itemTypes = set()
 circular_recv_buffer = deque(maxlen=20)
@@ -374,6 +376,9 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         super().__init__()
         self.setupUi(self)
         self.client = client
+
+        # Initialize Voice Client
+        self.voice_client = self.client.voice_client
         ############################################################################################################
         # Ensure all buttons behave properly when clicked
         self.list_of_buttons = [self.pb_Pen, self.pb_Eraser, self.pb_Line, self.pb_Ellipse, self.pb_Rectangle]
@@ -384,6 +389,8 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.pb_Line.clicked.connect(self.button_clicked)
         self.pb_Ellipse.clicked.connect(self.button_clicked)
         self.pb_Rectangle.clicked.connect(self.button_clicked)
+        # Connect Mic Button to toggle function
+        self.pushButton.clicked.connect(self.toggle_mic)
 
         self.current_color = QColor("#000000")
 
@@ -422,6 +429,11 @@ class MainWindow(QMainWindow, Ui_MainWindow):
 
         self.redo_list = []
         self.current_file = None
+
+    def toggle_mic(self):
+        """Toggle microphone ON/OFF."""
+        self.voice_client.toggle_mic()
+        self.pushButton.setText("Mic ON" if self.voice_client.mic_on else "Mic OFF")
 
     def showEvent(self, event, /):
         self.resize_scene()

@@ -7,7 +7,8 @@ from PySide6.QtNetwork import QHostAddress, QTcpSocket, QAbstractSocket
 from PySide6.QtCore import QByteArray, QDataStream, QIODevice, QObject, Signal, QThread
 from client_mg import SignalManager
 from WhiteboardApplication.Server.getip import get_local_ip
-
+from VoiceClient import VoiceClient
+import threading
 signal_manager = SignalManager()
 
 def get_ipv6_address():
@@ -27,6 +28,7 @@ class NetworkWorker(QObject):
     connection_status = Signal(bool)
     connect = Signal(str, int) # host, port
     send_data_signal = Signal(dict, bool)
+    voice_connected = Signal(bool)
 
     def __init__(self):
         super().__init__()
@@ -34,6 +36,7 @@ class NetworkWorker(QObject):
         self.connect.connect(self.connect_to_host)
         self.client : QTcpSocket = None
         self.setup_client()
+        self.voice_client = VoiceClient()
 
     def setup_client(self):
         self.client = QTcpSocket()
@@ -48,6 +51,17 @@ class NetworkWorker(QObject):
         self.client.connectToHost(QHostAddress(host), port)
         if not self.client.waitForConnected(5000):
             self.connection_status.emit(False)
+        else:
+            threading.Thread(target=self.connect_to_voice, args=(host,), daemon=True).start()
+
+    def connect_to_voice(self, host):
+        """Handles voice chat connection separately to avoid blocking."""
+        if self.voice_client.connect(host):
+            print("[CLIENT] Connected to voice chat.")
+            self.voice_connected.emit(True)
+        else:
+            print("[CLIENT] Voice chat connection failed.")
+            self.voice_connected.emit(False)
 
     def on_connected(self):
         print("Connected to server")
@@ -113,9 +127,17 @@ class MyClient(QTcpSocket):
         self.worker = NetworkWorker()
         self.worker.moveToThread(self.thread)
         self.thread.start()
+        self.voice_client = self.worker.voice_client  # ✅ Use the same VoiceClient from NetworkWorker
+        self.worker.voice_connected.connect(self.on_voice_connected)
 
     def connect_to_server(self, host, port):
         self.worker.connect.emit(host, port)
+
+    def on_voice_connected(self, status):
+        if status:
+            print("[CLIENT] Voice chat connected.")
+        else:
+            print("[CLIENT] Voice chat connection failed.")
 
     def send_data(self, scene_info, flag):
         self.worker.send_data_signal.emit(scene_info, flag)
@@ -128,6 +150,9 @@ class MyClient(QTcpSocket):
         if self.thread.isRunning():
             self.thread.terminate()
         self.thread.deleteLater()
+
+        if self.voice_client:
+            self.voice_client.disconnect()
 
 
 def start_client(client: MyClient):
