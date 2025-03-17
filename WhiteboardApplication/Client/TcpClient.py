@@ -390,7 +390,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.pb_Ellipse.clicked.connect(self.button_clicked)
         self.pb_Rectangle.clicked.connect(self.button_clicked)
         # Connect Mic Button to toggle function
-        self.pushButton.clicked.connect(self.toggle_mic)
+        self.pb_Mic.clicked.connect(self.toggle_mic)
 
         self.current_color = QColor("#000000")
 
@@ -433,7 +433,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
     def toggle_mic(self):
         """Toggle microphone ON/OFF."""
         self.voice_client.toggle_mic()
-        self.pushButton.setText("Mic ON" if self.voice_client.mic_on else "Mic OFF")
+        self.pb_Mic.setText("Mic ON" if self.voice_client.mic_on else "Mic OFF")
 
     def showEvent(self, event, /):
         self.resize_scene()

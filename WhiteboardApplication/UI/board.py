@@ -83,10 +83,10 @@ class Ui_MainWindow(object):
 
         self.gridLayout.addWidget(self.pb_Undo, 11, 0, 1, 1)
 
-        self.pushButton = QPushButton(self.centralwidget)
-        self.pushButton.setObjectName(u"pushButton")
+        self.pb_Mic = QPushButton(self.centralwidget)
+        self.pb_Mic.setObjectName(u"pb_Mic")
 
-        self.gridLayout.addWidget(self.pushButton, 9, 0, 1, 1)
+        self.gridLayout.addWidget(self.pb_Mic, 9, 0, 1, 1)
 
         self.verticalSpacer_2 = QSpacerItem(20, 40, QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Expanding)
 
@@ -217,7 +217,7 @@ class Ui_MainWindow(object):
         self.pb_Undo.setWhatsThis(QCoreApplication.translate("MainWindow", u"<html><head/><body><p><br/></p></body></html>", None))
 #endif // QT_CONFIG(whatsthis)
         self.pb_Undo.setText("")
-        self.pushButton.setText(QCoreApplication.translate("MainWindow", u"Mic", None))
+        self.pb_Mic.setText(QCoreApplication.translate("MainWindow", u"Mic", None))
 #if QT_CONFIG(tooltip)
         self.pb_Redo.setToolTip(QCoreApplication.translate("MainWindow", u"<html><head/><body><p>Redo</p></body></html>", None))
 #endif // QT_CONFIG(tooltip)
