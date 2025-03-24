@@ -66,28 +66,23 @@ class Ui_MainWindow(object):
         self.centralwidget.setObjectName(u"centralwidget")
         self.gridLayout = QGridLayout(self.centralwidget)
         self.gridLayout.setObjectName(u"gridLayout")
-        self.pb_Pen = QPushButton(self.centralwidget)
-        self.pb_Pen.setObjectName(u"pb_Pen")
-        icon = QIcon()
-        icon.addFile(u":/Tools/pen.png", QSize(), QIcon.Mode.Normal, QIcon.State.Off)
-        self.pb_Pen.setIcon(icon)
-        self.pb_Pen.setCheckable(True)
-
-        self.gridLayout.addWidget(self.pb_Pen, 0, 0, 1, 1)
-
-        self.cb_Fill_Color = QCheckBox(self.centralwidget)
-        self.cb_Fill_Color.setObjectName(u"cb_Fill_Color")
-
-        self.gridLayout.addWidget(self.cb_Fill_Color, 5, 0, 1, 1)
-
         self.pb_Undo = QPushButton(self.centralwidget)
         self.pb_Undo.setObjectName(u"pb_Undo")
-        icon1 = QIcon()
-        icon1.addFile(u":/Tools/undo.png", QSize(), QIcon.Mode.Normal, QIcon.State.Off)
-        self.pb_Undo.setIcon(icon1)
+        icon = QIcon()
+        icon.addFile(u":/Tools/undo.png", QSize(), QIcon.Mode.Normal, QIcon.State.Off)
+        self.pb_Undo.setIcon(icon)
         self.pb_Undo.setCheckable(False)
 
-        self.gridLayout.addWidget(self.pb_Undo, 12, 0, 1, 1)
+        self.gridLayout.addWidget(self.pb_Undo, 15, 0, 1, 1)
+
+        self.pb_Pen = QPushButton(self.centralwidget)
+        self.pb_Pen.setObjectName(u"pb_Pen")
+        icon1 = QIcon()
+        icon1.addFile(u":/Tools/pen.png", QSize(), QIcon.Mode.Normal, QIcon.State.Off)
+        self.pb_Pen.setIcon(icon1)
+        self.pb_Pen.setCheckable(True)
+
+        self.gridLayout.addWidget(self.pb_Pen, 2, 0, 1, 1)
 
         self.pb_Redo = QPushButton(self.centralwidget)
         self.pb_Redo.setObjectName(u"pb_Redo")
@@ -96,7 +91,82 @@ class Ui_MainWindow(object):
         self.pb_Redo.setIcon(icon2)
         self.pb_Redo.setCheckable(False)
 
-        self.gridLayout.addWidget(self.pb_Redo, 13, 0, 1, 1)
+        self.gridLayout.addWidget(self.pb_Redo, 16, 0, 1, 1)
+
+        self.verticalSpacer_2 = QSpacerItem(20, 40, QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Expanding)
+
+        self.gridLayout.addItem(self.verticalSpacer_2, 9, 0, 1, 1)
+
+        self.dial = QDial(self.centralwidget)
+        self.dial.setObjectName(u"dial")
+
+        self.gridLayout.addWidget(self.dial, 10, 0, 1, 1)
+
+        self.pb_Color = QPushButton(self.centralwidget)
+        self.pb_Color.setObjectName(u"pb_Color")
+        self.pb_Color.setCheckable(False)
+
+        self.gridLayout.addWidget(self.pb_Color, 11, 0, 1, 1)
+
+        self.pb_Eraser = QPushButton(self.centralwidget)
+        self.pb_Eraser.setObjectName(u"pb_Eraser")
+        icon3 = QIcon()
+        icon3.addFile(u":/Tools/eraser.png", QSize(), QIcon.Mode.Normal, QIcon.State.Off)
+        self.pb_Eraser.setIcon(icon3)
+        self.pb_Eraser.setCheckable(True)
+
+        self.gridLayout.addWidget(self.pb_Eraser, 4, 0, 1, 1)
+
+        self.pb_Mic = QPushButton(self.centralwidget)
+        self.pb_Mic.setObjectName(u"pb_Mic")
+
+        self.gridLayout.addWidget(self.pb_Mic, 13, 0, 1, 1)
+
+        self.pb_Line = QPushButton(self.centralwidget)
+        self.pb_Line.setObjectName(u"pb_Line")
+        icon4 = QIcon()
+        icon4.addFile(u":/Tools/line.png", QSize(), QIcon.Mode.Normal, QIcon.State.Off)
+        self.pb_Line.setIcon(icon4)
+        self.pb_Line.setCheckable(True)
+
+        self.gridLayout.addWidget(self.pb_Line, 5, 0, 1, 1)
+
+        self.verticalSpacer = QSpacerItem(20, 40, QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Expanding)
+
+        self.gridLayout.addItem(self.verticalSpacer, 12, 0, 1, 1)
+
+        self.cb_Fill_Color = QCheckBox(self.centralwidget)
+        self.cb_Fill_Color.setObjectName(u"cb_Fill_Color")
+
+        self.gridLayout.addWidget(self.cb_Fill_Color, 8, 0, 1, 1)
+
+        self.pb_Rectangle = QPushButton(self.centralwidget)
+        self.pb_Rectangle.setObjectName(u"pb_Rectangle")
+        icon5 = QIcon()
+        icon5.addFile(u":/Tools/rect.png", QSize(), QIcon.Mode.Normal, QIcon.State.Off)
+        self.pb_Rectangle.setIcon(icon5)
+        self.pb_Rectangle.setCheckable(True)
+
+        self.gridLayout.addWidget(self.pb_Rectangle, 6, 0, 1, 1)
+
+        self.pb_Ellipse = QPushButton(self.centralwidget)
+        self.pb_Ellipse.setObjectName(u"pb_Ellipse")
+        icon6 = QIcon()
+        icon6.addFile(u":/Tools/ellipse.png", QSize(), QIcon.Mode.Normal, QIcon.State.Off)
+        self.pb_Ellipse.setIcon(icon6)
+        self.pb_Ellipse.setCheckable(True)
+
+        self.gridLayout.addWidget(self.pb_Ellipse, 7, 0, 1, 1)
+
+        self.verticalSpacer_3 = QSpacerItem(20, 40, QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Expanding)
+
+        self.gridLayout.addItem(self.verticalSpacer_3, 14, 0, 1, 1)
+
+        self.pb_Select = QPushButton(self.centralwidget)
+        self.pb_Select.setObjectName(u"pb_Select")
+        self.pb_Select.setCheckable(True)
+
+        self.gridLayout.addWidget(self.pb_Select, 1, 0, 1, 1)
 
         self.gv_Canvas = QGraphicsView(self.centralwidget)
         self.gv_Canvas.setObjectName(u"gv_Canvas")
@@ -108,71 +178,7 @@ class Ui_MainWindow(object):
         self.gv_Canvas.setStyleSheet(u"QGraphicsView { background-color: white; }\n"
 "")
 
-        self.gridLayout.addWidget(self.gv_Canvas, 0, 1, 14, 1)
-
-        self.pb_Rectangle = QPushButton(self.centralwidget)
-        self.pb_Rectangle.setObjectName(u"pb_Rectangle")
-        icon3 = QIcon()
-        icon3.addFile(u":/Tools/rect.png", QSize(), QIcon.Mode.Normal, QIcon.State.Off)
-        self.pb_Rectangle.setIcon(icon3)
-        self.pb_Rectangle.setCheckable(True)
-
-        self.gridLayout.addWidget(self.pb_Rectangle, 3, 0, 1, 1)
-
-        self.pb_Eraser = QPushButton(self.centralwidget)
-        self.pb_Eraser.setObjectName(u"pb_Eraser")
-        icon4 = QIcon()
-        icon4.addFile(u":/Tools/eraser.png", QSize(), QIcon.Mode.Normal, QIcon.State.Off)
-        self.pb_Eraser.setIcon(icon4)
-        self.pb_Eraser.setCheckable(True)
-
-        self.gridLayout.addWidget(self.pb_Eraser, 1, 0, 1, 1)
-
-        self.pb_Mic = QPushButton(self.centralwidget)
-        self.pb_Mic.setObjectName(u"pb_Mic")
-
-        self.gridLayout.addWidget(self.pb_Mic, 10, 0, 1, 1)
-
-        self.verticalSpacer_2 = QSpacerItem(20, 40, QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Expanding)
-
-        self.gridLayout.addItem(self.verticalSpacer_2, 6, 0, 1, 1)
-
-        self.verticalSpacer = QSpacerItem(20, 40, QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Expanding)
-
-        self.gridLayout.addItem(self.verticalSpacer, 9, 0, 1, 1)
-
-        self.pb_Color = QPushButton(self.centralwidget)
-        self.pb_Color.setObjectName(u"pb_Color")
-        self.pb_Color.setCheckable(False)
-
-        self.gridLayout.addWidget(self.pb_Color, 8, 0, 1, 1)
-
-        self.dial = QDial(self.centralwidget)
-        self.dial.setObjectName(u"dial")
-
-        self.gridLayout.addWidget(self.dial, 7, 0, 1, 1)
-
-        self.pb_Line = QPushButton(self.centralwidget)
-        self.pb_Line.setObjectName(u"pb_Line")
-        icon5 = QIcon()
-        icon5.addFile(u":/Tools/line.png", QSize(), QIcon.Mode.Normal, QIcon.State.Off)
-        self.pb_Line.setIcon(icon5)
-        self.pb_Line.setCheckable(True)
-
-        self.gridLayout.addWidget(self.pb_Line, 2, 0, 1, 1)
-
-        self.pb_Ellipse = QPushButton(self.centralwidget)
-        self.pb_Ellipse.setObjectName(u"pb_Ellipse")
-        icon6 = QIcon()
-        icon6.addFile(u":/Tools/ellipse.png", QSize(), QIcon.Mode.Normal, QIcon.State.Off)
-        self.pb_Ellipse.setIcon(icon6)
-        self.pb_Ellipse.setCheckable(True)
-
-        self.gridLayout.addWidget(self.pb_Ellipse, 4, 0, 1, 1)
-
-        self.verticalSpacer_3 = QSpacerItem(20, 40, QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Expanding)
-
-        self.gridLayout.addItem(self.verticalSpacer_3, 11, 0, 1, 1)
+        self.gridLayout.addWidget(self.gv_Canvas, 1, 1, 16, 1)
 
         MainWindow.setCentralWidget(self.centralwidget)
         self.menubar = QMenuBar(MainWindow)
@@ -216,11 +222,6 @@ class Ui_MainWindow(object):
         self.actionNew_4.setText(QCoreApplication.translate("MainWindow", u"New", None))
         self.actionNew_3.setText(QCoreApplication.translate("MainWindow", u"New", None))
 #if QT_CONFIG(tooltip)
-        self.pb_Pen.setToolTip(QCoreApplication.translate("MainWindow", u"<html><head/><body><p>Pen</p></body></html>", None))
-#endif // QT_CONFIG(tooltip)
-        self.pb_Pen.setText("")
-        self.cb_Fill_Color.setText(QCoreApplication.translate("MainWindow", u"Fill Color", None))
-#if QT_CONFIG(tooltip)
         self.pb_Undo.setToolTip(QCoreApplication.translate("MainWindow", u"<html><head/><body><p>Undo</p></body></html>", None))
 #endif // QT_CONFIG(tooltip)
 #if QT_CONFIG(whatsthis)
@@ -228,18 +229,24 @@ class Ui_MainWindow(object):
 #endif // QT_CONFIG(whatsthis)
         self.pb_Undo.setText("")
 #if QT_CONFIG(tooltip)
+        self.pb_Pen.setToolTip(QCoreApplication.translate("MainWindow", u"<html><head/><body><p>Pen</p></body></html>", None))
+#endif // QT_CONFIG(tooltip)
+        self.pb_Pen.setText("")
+#if QT_CONFIG(tooltip)
         self.pb_Redo.setToolTip(QCoreApplication.translate("MainWindow", u"<html><head/><body><p>Redo</p></body></html>", None))
 #endif // QT_CONFIG(tooltip)
         self.pb_Redo.setText("")
-        self.pb_Rectangle.setText("")
+        self.pb_Color.setText(QCoreApplication.translate("MainWindow", u"Color", None))
 #if QT_CONFIG(tooltip)
         self.pb_Eraser.setToolTip(QCoreApplication.translate("MainWindow", u"<html><head/><body><p>Eraser</p></body></html>", None))
 #endif // QT_CONFIG(tooltip)
         self.pb_Eraser.setText("")
         self.pb_Mic.setText(QCoreApplication.translate("MainWindow", u"Mic", None))
-        self.pb_Color.setText(QCoreApplication.translate("MainWindow", u"Color", None))
         self.pb_Line.setText("")
+        self.cb_Fill_Color.setText(QCoreApplication.translate("MainWindow", u"Fill Color", None))
+        self.pb_Rectangle.setText("")
         self.pb_Ellipse.setText("")
+        self.pb_Select.setText(QCoreApplication.translate("MainWindow", u"Select", None))
         self.menuFile.setTitle(QCoreApplication.translate("MainWindow", u"File", None))
     # retranslateUi
 

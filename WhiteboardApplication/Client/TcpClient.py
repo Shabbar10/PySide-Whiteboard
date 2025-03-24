@@ -1,6 +1,6 @@
 import sys
 import cProfile, pstats
-
+from math import atan2, degrees, sin, cos, pi
 
 from PySide6.QtWidgets import (
     QMainWindow,
@@ -13,6 +13,7 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
     QLineEdit,
     QPushButton,
+    QGraphicsItem,
     QGraphicsEllipseItem,
     QGraphicsRectItem,
     QGraphicsView,
@@ -27,7 +28,6 @@ from PySide6.QtGui import (
     QPalette,
     QLinearGradient,
     QFont,
-    QMouseEvent,
 )
 
 from PySide6.QtCore import (
@@ -39,13 +39,11 @@ from PySide6.QtCore import (
     QRectF,
     QThread,
     QPointF,
-    QEvent,
 )
 import json
 from TcpClientNet import start_client, MyClient, signal_manager
 from WhiteboardApplication.UI.board import Ui_MainWindow
 from collections import deque
-from VoiceClient import VoiceClient
 
 
 itemTypes = set()
@@ -55,6 +53,187 @@ buffer_flag = 0
 login_flag = False
 itemTypes = set()
 validation_dict = {'Atharva': 'ghanekar', 'Abubakar': 'siddiq', 'Shabbar': 'adamjee', 'Hussain': 'ceyloni', '': ''}
+
+
+class HandleItem(QGraphicsRectItem):
+    Resize = 0
+    Rotate = 1
+
+    def __init__(self, parent=None, handle_type=Resize, position=0):
+        """
+        Create a handle item for manipulating shapes
+
+        :param parent: Parent graphics item
+        :param handle_type: Resize or Rotate
+        :param position: For resize handles, position around the parent (0-7)
+        """
+        super().__init__(parent)
+
+        self.handle_type = handle_type
+        self.position = position
+        self.setFlag(QGraphicsItem.GraphicsItemFlag.ItemIsSelectable, False)
+        self.setFlag(QGraphicsItem.GraphicsItemFlag.ItemIsMovable, False)
+        self.setFlag(QGraphicsItem.GraphicsItemFlag.ItemSendsGeometryChanges, False)
+        self.acceptHoverEvents()
+
+        handle_size = 10
+
+        if handle_type == HandleItem.Resize:
+            self.setRect(-handle_size/2, -handle_size/2, handle_size, handle_size)
+            self.setBrush(QColor(0, 122, 204))
+        else:
+            self.setRect(-handle_size/2, -handle_size/2, handle_size, handle_size)
+            self.setBrush(QColor(204, 0, 0))
+
+        self.setPen(QPen(Qt.black, 1))
+        self.setZValue(100)
+
+    def hoverEnterEvent(self, event, /):
+        if self.handle_type == HandleItem.Resize:
+            if self.position in [0, 4]: # Top-left, bottom-right
+                self.setCursor(Qt.CursorShape.SizeFDiagCursor)
+            elif self.position in [1, 5]: # Top-center, bottom-center
+                self.setCursor(Qt.CursorShape.SizeVerCursor)
+            elif self.position in [2, 6]: # Top-right, bottom-left
+                self.setCursor(Qt.CursorShape.SizeBDiagCursor)
+            else: # Left-center, right-center
+                self.setCursor(Qt.CursorShape.SizeHorCursor)
+        else: # Rotate handle
+            self.setCursor(Qt.CursorShape.PointingHandCursor)
+        super().hoverEnterEvent(event)
+
+    def hoverLeaveEvent(self, event, /):
+        self.setCursor(Qt.CursorShape.ArrowCursor)
+        super().hoverLeaveEvent(event)
+
+
+class SelectableRectItem(QGraphicsRectItem):
+    def __init__(self, rect=None, parent=None):
+        if rect is None:
+            rect = QRectF(0, 0, 100, 100)
+        super().__init__(rect, parent)
+
+        self.setFlag(QGraphicsItem.GraphicsItemFlag.ItemIsSelectable, True)
+        self.setFlag(QGraphicsItem.GraphicsItemFlag.ItemIsMovable, True)
+        self.setFlag(QGraphicsItem.GraphicsItemFlag.ItemSendsGeometryChanges, True)
+
+        self.handles = []
+        self._selected = False
+        self._start_rect = None
+        self._start_pos = None
+        self._start_transform = None
+        self._current_handle = None
+
+    def itemChange(self, change, value, /):
+        if change == QGraphicsItem.GraphicsItemChange.ItemSelectedHasChanged:
+            self._selected = bool(value)
+            self.update_handles()
+        return super().itemChange(change, value)
+
+    def update_handles(self):
+        # Remove existing handles
+        for handle in self.handles:
+            if handle.scene():
+                handle.scene().removeItem(handle)
+        self.handles.clear()
+
+        # If selected, create new handles
+        if self._selected:
+            rect = self.rect()
+
+            # Create resize handles at corners and midpoints
+            positions = [
+                (rect.left(), rect.top()),          # 0: Top-left
+                (rect.center().x(), rect.top()),    # 1: Top-center
+                (rect.right(), rect.top()),         # 2: Top-right
+                (rect.left(), rect.center().y()),   # 3: Left-center
+                (rect.right(), rect.center().y()),  # 4: Right-center
+                (rect.left(), rect.bottom()),       # 5: Bottom-left
+                (rect.center().x(), rect.bottom()), # 6: Bottom-center
+                (rect.right(), rect.top()),         # 7: Bottom-right
+            ]
+
+            for i, pos in enumerate(positions):
+                handle = HandleItem(self, HandleItem.Resize, i)
+                handle.setPos(pos[0], pos[1])
+                self.handles.append(handle)
+
+            # Add rotate handle above top-center
+            rotate_handle = HandleItem(self, HandleItem.Rotate)
+            rotate_handle.setPos(rect.center().x(), rect.top() - 30)
+            self.handles.append(rotate_handle)
+
+    def mousePressEvent(self, event, /):
+        # Store initial state for possible manipulation
+        self._start_rect = self.rect()
+        self._start_pos = event.scenePos()
+        self._start_transform = self.transform()
+
+        # Check if we're grabbing a handle
+        item_under_mouse = self.scene().itemAt(event.scenePos(), self.transform())
+        if isinstance(item_under_mouse, HandleItem) and item_under_mouse.parentItem() == self:
+            self._current_handle = item_under_mouse
+            event.accept()
+            return
+
+        super().mousePressEvent(event)
+
+    def mouseMoveEvent(self, event, /):
+        if self._current_handle and self._start_rect:
+            handle = self._current_handle
+            delta = event.scenePos() - self._start_pos
+
+            if handle.handle_type == HandleItem.Resize:
+                # Resize based on which handle was grabbed
+                new_rect = QRectF(self._start_rect)
+
+                if handle.position == 0:  # Top-left
+                    new_rect.setTopLeft(new_rect.topLeft() + delta)
+                elif handle.position == 1:  # Top-center
+                    new_rect.setTop(new_rect.top() + delta.y())
+                elif handle.position == 2:  # Top-right
+                    new_rect.setTopRight(new_rect.topRight() + delta)
+                elif handle.position == 3:  # Left-center
+                    new_rect.setLeft(new_rect.left() + delta.x())
+                elif handle.position == 4:  # Right-center
+                    new_rect.setRight(new_rect.right() + delta.x())
+                elif handle.position == 5:  # Bottom-left
+                    new_rect.setBottomLeft(new_rect.bottomLeft() + delta)
+                elif handle.position == 6:  # Bottom-center
+                    new_rect.setBottom(new_rect.bottom() + delta.y())
+                elif handle.position == 7:  # Bottom-right
+                    new_rect.setBottomRight(new_rect.bottomRight() + delta)
+
+                # Don't allow negative width/height
+                if new_rect.width() >= 10 and new_rect.height() >= 10:
+                    self.setRect(new_rect)
+                    self.update_handles()
+
+            elif handle.handle_type == HandleItem.Rotate:
+                # Calculate rotation angle
+                rect_center = self.mapToScene(self._start_rect.center())
+                start_vector = self._start_pos - rect_center
+                current_vector = event.scenePos() - rect_center
+
+                start_angle = degrees(atan2(start_vector.y(), start_vector.x()))
+                current_angle = degrees(atan2(current_vector.y(), current_vector.x()))
+                rotation_angle = current_angle - start_angle
+
+                # Apply rotation around center
+                self.setTransform(self._start_transform)
+                self.setRotation(self.rotation() + rotation_angle)
+
+            event.accept()
+            return
+
+        super().mouseMoveEvent(event)
+
+    def mouseReleaseEvent(self, event, /):
+        self._current_handle = None
+        self._start_rect = None
+        self._start_pos = None
+        self._start_transform = None
+        super().mouseReleaseEvent(event)
 
 
 class BoardScene(QGraphicsScene):
@@ -81,6 +260,7 @@ class BoardScene(QGraphicsScene):
         self.current_stroke_group = []
 
         self.pen_mode = True
+        self.selection_mode = False
         self.line_mode = False
         self.ellipse_mode = False
         self.rectangle_mode = False
@@ -135,6 +315,15 @@ class BoardScene(QGraphicsScene):
         self.line_mode = False
         self.ellipse_mode = False
         self.eraser_mode = False
+        self.selection_mode = False
+
+    def set_selection_mode(self, mode):
+        self.selection_mode = mode
+        self.pen_mode = False
+        self.rectangle_mode = False
+        self.line_mode = False
+        self.ellipse_mode = False
+        self.eraser_mode = False
 
     def set_rectangle_mode(self, mode):
         self.rectangle_mode = mode
@@ -142,6 +331,7 @@ class BoardScene(QGraphicsScene):
         self.line_mode = False
         self.ellipse_mode = False
         self.eraser_mode = False
+        self.selection_mode = False
 
     def set_line_mode(self, mode):
         self.line_mode = mode
@@ -149,6 +339,7 @@ class BoardScene(QGraphicsScene):
         self.ellipse_mode = False
         self.rectangle_mode = False
         self.eraser_mode = False
+        self.selection_mode = False
 
     def set_ellipse_mode(self, mode):
         self.ellipse_mode = mode
@@ -156,6 +347,7 @@ class BoardScene(QGraphicsScene):
         self.line_mode = False
         self.rectangle_mode = False
         self.eraser_mode = False
+        self.selection_mode = False
 
     def set_eraser_mode(self, mode):
         self.eraser_mode = mode
@@ -163,18 +355,23 @@ class BoardScene(QGraphicsScene):
         self.ellipse_mode = False
         self.line_mode = False
         self.rectangle_mode = False
+        self.selection_mode = False
 
     def toggle_fill_color(self):
         self.fill_shape = not self.fill_shape
 
     def mousePressEvent(self, event):
+        if self.selection_mode:
+            super().mousePressEvent(event)
+            return
+
         if event.button() == Qt.MouseButton.LeftButton:
             self.drawing = True
             self.current_stroke_group = []
 
             if self.rectangle_mode:
                 self.start_pos = event.scenePos()
-                self.pathItem = QGraphicsRectItem()
+                self.pathItem = SelectableRectItem()
                 self.pathItem.setPen(QPen(self.color, self.size))
                 if self.fill_shape:
                     self.pathItem.setBrush(self.color)
@@ -212,6 +409,10 @@ class BoardScene(QGraphicsScene):
         #super().mousePressEvent(event)
 
     def mouseMoveEvent(self, event):
+        if self.selection_mode:
+            super().mouseMoveEvent(event)
+            return
+
         if self.drawing:
             curr_position = event.scenePos()
 
@@ -559,6 +760,8 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.pb_Line.clicked.connect(self.button_clicked)
         self.pb_Ellipse.clicked.connect(self.button_clicked)
         self.pb_Rectangle.clicked.connect(self.button_clicked)
+        self.pb_Select.clicked.connect(self.button_clicked)
+
         # Connect Mic Button to toggle function
         self.pb_Mic.clicked.connect(self.toggle_mic)
 
@@ -795,6 +998,7 @@ class MainWindow(QMainWindow, Ui_MainWindow):
         self.pb_Line.setChecked(False)
         self.pb_Ellipse.setChecked(False)
         self.pb_Rectangle.setChecked(False)
+        self.pb_Select.setChecked(False)
 
     def color_changed(self, color):
         self.scene.change_color(color)
@@ -809,6 +1013,13 @@ class MainWindow(QMainWindow, Ui_MainWindow):
 
         if sender_button == self.pb_Eraser:
             self.scene.set_eraser_mode(True)
+        elif sender_button == self.pb_Select:
+            self.scene.set_selection_mode(True)
+
+    def toggle_select_mode(self):
+        self.deselect_current_mode()
+        self.scene.set_selection_mode(True)
+        self.pb_Select.setChecked(True)
 
     def toggle_pen_mode(self):
         self.deselect_current_mode()
