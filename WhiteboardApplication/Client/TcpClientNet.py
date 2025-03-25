@@ -155,9 +155,11 @@ class NetworkWorker(QObject):
             self.receive_buffer.append(data)
 
             try:
-                message_data = self.receive_buffer.data().decode('utf-8')
-                json_data = json.loads(message_data)
-                signal_manager.data_ack.emit(json_data)
+                #message_data = self.receive_buffer.data().decode('utf-8')
+                message_data = msgpack.unpackb(self.receive_buffer.data())
+                #json_data = json.loads(message_data)
+                print(f"Message data: {message_data}")
+                signal_manager.data_ack.emit(message_data)
             except JSONDecodeError as e:
                 print(f"JSON decode error: {e}")
             finally:
@@ -203,7 +205,7 @@ class MyClient(QTcpSocket):
 def start_client(client: MyClient):
     ip = get_local_ip()
     # ip = get_ipv6_address()
-    client.connect_to_server(ip, 8080)
+    client.connect_to_server("192.168.29.173", 8080)
     #client.connectToHost(QHostAddress("10.20.77.115"), 8080)
     #client.connectToHost(QHostAddress(ip), 8080)
 

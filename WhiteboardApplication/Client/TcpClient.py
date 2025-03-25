@@ -545,8 +545,10 @@ class SceneBuilderWorker(QObject):
 
     @Slot(dict)
     def add_to_scene(self, data):
+        print(f"Data to add: {data}")
         scene = self.scene
-        scene_file = data['scene_info']
+        scene_file = data['batch'][0]['scene_info']
+        print(f"Scene file: {scene_file}")
 
         try:
             scene.change_color(QColor(scene_file['color']))
@@ -570,12 +572,13 @@ class SceneBuilderWorker(QObject):
                     scene.addItem(pathItem)
 
             elif scene_file['type'] == 'rectangle':
+                print("Yes, rectangle")
                 rect_data = scene_file['points']
                 rect = QRectF(rect_data[0], rect_data[1], rect_data[2], rect_data[3])
                 rectItem = QGraphicsRectItem(rect)
                 my_pen = QPen(QColor(scene_file['color']), scene_file['width'])
                 rectItem.setPen(my_pen)
-                #print(f"Adding rectangle: {rectItem}")
+                print(f"Adding rectangle: {rectItem}")
                 scene.addItem(rectItem)
 
             elif scene_file['type'] == 'ellipse':
